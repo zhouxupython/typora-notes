@@ -19,7 +19,14 @@ union bpf_attr {
               __u32  key_size;      /* size of key in bytes  这个是创建时指定的key长度*/
               __u32  value_size;    /* size of value in bytes */
               __u32  max_entries;   /* max number of entries in a map */
-
+              __u32  map_flags;     /* BPF_MAP_CREATE related
+                                                     * flags defined above.
+                                                     */
+              __u32  inner_map_fd;  /* fd pointing to the inner map */
+               __u32  numa_node;  /* numa node (effective only if
+                                                      * BPF_F_NUMA_NODE is set).
+                                                      */
+              char  map_name[BPF_OBJ_NAME_LEN];
        };
 
        struct { /* anonymous struct used by BPF_MAP_*_ELEM commands */

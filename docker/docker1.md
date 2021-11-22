@@ -14,4 +14,15 @@ sudo apt-get install -y docker-ce
 
 
 
-llvm  13
+### [docker 镜像加速，修改为阿里云镜像](https://www.cnblogs.com/codeBang/p/11904924.html)
+
+```shell
+zx@u18-1:/etc/docker$ sudo cat daemon.json
+{
+  "registry-mirrors": ["http://hub-mirror.c.163.com"]
+}
+
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+

@@ -1,0 +1,14 @@
+  833  git remote add origin https://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@github.com/zhouxupython/typora-notes.git 
+  834  git push origin main
+
+
+token:
+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 
+
+modify files
+  836  git status .
+  837  git add .
+       git status .
+  838  git commit -m "20211122-2"
+  840  git push origin main
+

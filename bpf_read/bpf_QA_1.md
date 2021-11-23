@@ -151,3 +151,51 @@ bpf相关的api，哪些是==用户层面==使用的，哪些是==内核层面==
 
 ------
 
+字段的含义
+
+zx@zx:~/works/ebpf/src_from_github/linux-bpf-learning/tc$ sudo ip link set dev veth0afb74f xdp object tc-xdp-drop-tcp.o section xdp verbose
+
+Prog section 'xdp' loaded (5)!
+ - Type:         6
+ - Instructions: 18 (0 over limit)
+ - License:      GPL
+
+Verifier analysis:
+
+processed 25 insns (limit 1000000) max_states_per_insn 0 total_states 2 peak_states 2 mark_read 1
+
+
+
+x@zx:~$ ip a
+5: veth0afb74f@if4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default 
+    link/ether e2:2d:5e:ee:af:97 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::e02d:5eff:feee:af97/64 scope link 
+       valid_lft forever preferred_lft forever
+zx@zx:~$ ip a
+5: veth0afb74f@if4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 xdp/id:107 qdisc noqueue master docker0 state UP group default 
+    link/ether e2:2d:5e:ee:af:97 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::e02d:5eff:feee:af97/64 scope link 
+       valid_lft forever preferred_lft forever
+
+
+【Q】xdp/id:107  含义是什么
+
+------
+
+为何
+
+bpf_read/experiments/exp1.md:反复开启关闭xdp访问外网
+
+和 ==https://davidlovezoe.club/wordpress/archives/952 2. 在Nginx容器内部curl外部网站==实验结果不一样
+
+------
+
+为何
+
+ https://davidlovezoe.club/wordpress/archives/952 的xdp使用后，ip a 命令显示的是 “xdpgeneric”
+
+自己测试的是 xdp/id:107 这样的，有何不同？
+
+------
+
+tcpdump抓包的钩子点，与xdp、tc的钩子点比较

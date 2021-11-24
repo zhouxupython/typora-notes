@@ -945,6 +945,10 @@ Nping done: 1 IP address pinged in 1.68 seconds
 
 ![image-20211124101817246](./image-20211124101817246.png)
 
+<img src="exp1/image-20211124101817246.png" />
+
+
+
 
 
 ##### 2.4.4.2 主机访问docker容器的nginx服务

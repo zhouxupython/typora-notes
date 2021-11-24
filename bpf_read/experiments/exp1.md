@@ -2,9 +2,9 @@
 
 # experiment-1
 
-#### [你的第一个XDP BPF 程序](https://davidlovezoe.club/wordpress/archives/937)
+## 1. [你的第一个XDP BPF 程序](https://davidlovezoe.club/wordpress/archives/937)
 
-##### 主机和虚拟机
+### 1.1 主机和虚拟机
 
 ```shell
 zx@u18-1:~$ clang-13 -O2 -target bpf -c xdp-drop-world.c -o xdp-drop-world.o
@@ -70,13 +70,19 @@ processed 2 insns (limit 1000000) max_states_per_insn 0 total_states 0 peak_stat
 
 
 
+#### 1.1.1 未开启xdp程序
+
 未开启xdp程序，正常ping
 
 ![image-20211122231401912](C:\Users\zhouxu\AppData\Roaming\Typora\typora-user-images\image-20211122231401912.png)
 
+#### 1.1.2 开启xdp程序
+
 开启xdp程序，开始丢包
 
 ![image-20211122231619375](C:\Users\zhouxu\AppData\Roaming\Typora\typora-user-images\image-20211122231619375.png)
+
+#### 1.1.3 关闭xdp程序
 
 关闭xdp程序后，又可以ping通
 
@@ -84,7 +90,7 @@ processed 2 insns (limit 1000000) max_states_per_insn 0 total_states 0 peak_stat
 
 
 
-##### 虚拟机和其上的docker
+### 1.2 虚拟机和其上的docker
 
 ```shell
 zx@zx:/etc/docker$ sudo docker run -d -p 80:80 --name=nginx-xdp nginx:alpine
@@ -122,13 +128,13 @@ zx@zx:~/works/ebpf/src_from_github/linux-bpf-learning/tc$ curl localhost
 
 
 
-###### 没有启用xdp
+#### 1.2.1 未开启xdp程序
 
 没有启用xdp程序时，可以在docker外部通过curl命令获取docker-nginx的服务
 
 ![image-20211123094650419](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123094650419.png)
 
-###### 启动xdp
+#### 1.2.2 启动xdp程序
 
 ```shell
 zx@zx:~/works/ebpf/src_from_github/linux-bpf-learning/tc$ clang -I ./headers/ -O2 -target bpf -c tc-xdp-drop-tcp.c -o tc-xdp-drop-tcp.o
@@ -204,18 +210,20 @@ zx@zx:~/works/ebpf/src_from_github/linux-bpf-learning/tc$ curl localhost
 
 
 
-![image-20211123103837042](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123103837042.png)
+![image-20211123103837042](image-20211123103837042.png)
 
-###### 关闭xdp
+#### 1.2.3 关闭xdp程序
 
 ```
 #关闭xdp
 zx@zx:~/works/ebpf/src_from_github/linux-bpf-learning/tc$ sudo ip link set dev veth0afb74f xdp off
 ```
 
-![image-20211123104454150](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123104454150.png)
+![image-20211123104454150](image-20211123104454150.png)
 
-xdp开启前后，接口的变化
+
+
+#### 1.2.4 xdp程序开启前后，接口的变化
 
 ```shell
 x@zx:~$ ip a
@@ -239,9 +247,9 @@ zx@zx:~$ ip a
 
 
 
-#### [你的第一个TC BPF 程序](https://davidlovezoe.club/wordpress/archives/952)
+## 2. [你的第一个TC BPF 程序](https://davidlovezoe.club/wordpress/archives/952)
 
-##### 准备工作
+### 2.1 准备工作
 
 ```shell
 x@zx:~$ sudo docker inspect nginx-xdp -f "{{.NetworkSettings.SandboxKey}}"
@@ -334,7 +342,7 @@ zx@zx:~$ sudo ip netns exec httpserver curl  www.baidu.com
 
 
 
-##### 反复开启关闭xdp访问外网
+### 2.2 反复开启、关闭xdp程序访问外网
 
 这个和 ==https://davidlovezoe.club/wordpress/archives/952 2. 在Nginx容器内部curl外部网站==结果不一样
 
@@ -441,29 +449,37 @@ Nping done: 1 IP address pinged in 33.68 seconds
 
 ```
 
-![image-20211123141133282](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123141133282.png)
+![image-20211123141133282](image-20211123141133282.png)
+
+
 
 开启xdp后，docker容器去ping外网地址，需要经过主机上的docker0，也就是此时的veth6c30d72@if4接口，该接口上即开启了xdp程序，对于所有的ingress的tcp流量，是drop的，所以docker容器经过这个接口去外网的流量是出不去的，直接被veth6c30d72@if4接口丢弃，`由于xdp比抓包工具更早的接触到流量并抛弃`，因此tcpdump抓不到包的。
 
 如图，容器通过docker0访问外网，配对的veth上开启了xdp，丢弃tcp数据，那么此时容器发出的nping-tcp就被丢弃了。
 
-![image-20211123153200021](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123153200021.png)
-
-![image-20211123151820047](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123151820047.png)
+![image-20211123153200021](image-20211123153200021.png)
 
 
 
-##### 反复开启关闭xdp访问配对的veth
-
-![image-20211123154242780](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123154242780.png)
+![image-20211123151820047](image-20211123151820047.png)
 
 
 
-##### 同时使用XDP和TC
+
+
+### 2.3 反复开启、关闭xdp程序访问配对的veth
+
+![image-20211123154242780](image-20211123154242780.png)
+
+
+
+
+
+### 2.4 同时使用XDP和TC程序
 
 验证同时使用XDP和TC，控制RX和TX的TCP流量
 
-###### 准备工作
+#### 2.4.1 准备工作
 
 ```shell
 x@zx:~$ sudo ip link set dev veth6c30d72 xdp object ~/works/ebpf/src_from_github/linux-bpf-learning/tc/tc-xdp-drop-tcp.o section xdp verbose
@@ -503,37 +519,57 @@ zx@zx:~$
 
 
 
-###### 开启xdp和tc程序
+#### 2.4.2 开启xdp和tc程序
 
-- docker容器对外网地址和docker0进行nping-tcp，均失败
+##### 2.4.2.1 docker容器nping-tcp外网地址和docker0
+
+docker容器对外网地址和docker0进行nping-tcp，均失败。
 
 因为主机上的veth口开启了xdp，所以docker容器发到该接口或者由该接口转发的数据，均被丢弃。
 
 ==而且tcpdump不能抓到数据。==
 
-![image-20211123170040745](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123170040745.png)
 
-- 主机访问docker容器的nginx服务，因为主机的egress是drop tcp的，所以失败
 
-    ```shell
-    curl -m 5 -vvv   localhost
-    ```
+（1）外网地址
 
-    
+（2）docker0
 
-    
+![image-20211123170040745](image-20211123170040745.png)
 
-![image-20211123170930224](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123170930224.png)
+
+
+##### 2.4.2.2 主机访问docker容器的nginx服务
+
+主机访问docker容器的nginx服务，因为主机的egress是drop tcp的，所以失败
+
+```shell
+curl -m 5 -vvv   localhost
+```
+
+
+
+
+
+![image-20211123170930224](image-20211123170930224.png)
+
+
 
 ==那如何解释此处抓包也抓不到呢？==
 
-![image-20211123171948700](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123171948700.png)
+![image-20211123171948700](image-20211123171948700.png)
+
+
 
 这样看，应该是tcpdump的钩子点比TC更晚，导致流量被TC丢弃了，类似于上面的xdp丢弃流量
 
 【确认这一点？】
 
-- 主机nping-tcp docker容器的eth0，因为主机的egress是drop tcp的，所以失败，==同样抓不到包==
+
+
+##### 2.4.2.3 主机nping-tcp docker容器的eth0
+
+主机nping-tcp docker容器的eth0，因为主机的egress是drop tcp的，所以失败，==同样抓不到包==
 
 ```shell
 zx@zx:~$ sudo nping -c 100 --tcp 172.17.0.2
@@ -555,39 +591,47 @@ Nping done: 1 IP address pinged in 8.03 seconds
 
 ```
 
+==与【2.4.2.2】问题一样，为何不能抓包？==
 
 
-- 主机ping docker容器的eth0，因为ping是icmp协议，不是tcp协议，没有配置icmp协议的规则，所以通
 
-    ```shell
-    zx@zx:~$ sudo ping -c 5  172.17.0.2
-    PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
-    64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.038 ms
-    64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.045 ms
-    64 bytes from 172.17.0.2: icmp_seq=3 ttl=64 time=0.044 ms
-    64 bytes from 172.17.0.2: icmp_seq=4 ttl=64 time=0.043 ms
-    64 bytes from 172.17.0.2: icmp_seq=5 ttl=64 time=0.041 ms
-    
-    --- 172.17.0.2 ping statistics ---
-    5 packets transmitted, 5 received, 0% packet loss, time 4075ms
-    rtt min/avg/max/mdev = 0.038/0.042/0.045/0.002 ms
-    zx@zx:~$ 
-    
-    
-    x@zx:~$ sudo nping -c 5 --icmp 172.17.0.2
-    Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-23 17:31 CST
-    SENT (0.0372s) ICMP [172.17.0.1 > 172.17.0.2 Echo request (type=8/code=0) id=54397 seq=1] IP [ttl=64 id=35334 iplen=28 ]
-    RCVD (0.0374s) ICMP [172.17.0.2 > 172.17.0.1 Echo reply (type=0/code=0) id=54397 seq=1] IP [ttl=64 id=63620 iplen=28 ]
-     
-    Max rtt: 0.114ms | Min rtt: 0.025ms | Avg rtt: 0.055ms
-    Raw packets sent: 5 (140B) | Rcvd: 5 (140B) | Lost: 0 (0.00%)
-    Nping done: 1 IP address pinged in 4.07 seconds
-    
-    ```
 
-    
 
-- 同样道理,docker容器可以ping外部：
+##### 2.4.2.4 主机ping docker容器的eth0
+
+主机ping docker容器的eth0，因为ping是icmp协议，不是tcp协议，没有配置icmp协议的规则，所以通
+
+```shell
+zx@zx:~$ sudo ping -c 5  172.17.0.2
+PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
+64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.038 ms
+64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.045 ms
+64 bytes from 172.17.0.2: icmp_seq=3 ttl=64 time=0.044 ms
+64 bytes from 172.17.0.2: icmp_seq=4 ttl=64 time=0.043 ms
+64 bytes from 172.17.0.2: icmp_seq=5 ttl=64 time=0.041 ms
+
+--- 172.17.0.2 ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 4075ms
+rtt min/avg/max/mdev = 0.038/0.042/0.045/0.002 ms
+zx@zx:~$ 
+
+
+x@zx:~$ sudo nping -c 5 --icmp 172.17.0.2
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-23 17:31 CST
+SENT (0.0372s) ICMP [172.17.0.1 > 172.17.0.2 Echo request (type=8/code=0) id=54397 seq=1] IP [ttl=64 id=35334 iplen=28 ]
+RCVD (0.0374s) ICMP [172.17.0.2 > 172.17.0.1 Echo reply (type=0/code=0) id=54397 seq=1] IP [ttl=64 id=63620 iplen=28 ]
+ 
+Max rtt: 0.114ms | Min rtt: 0.025ms | Avg rtt: 0.055ms
+Raw packets sent: 5 (140B) | Rcvd: 5 (140B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 4.07 seconds
+
+```
+
+
+
+##### 2.4.2.5 docker容器ping外部地址
+
+同样道理,docker容器可以ping外部：
 
 ```shell
 x@zx:~$ sudo ip netns exec httpserver sudo nping -c 5 --icmp 172.17.0.1
@@ -620,77 +664,417 @@ Nping done: 1 IP address pinged in 4.76 seconds
 
 
 
-###### 先单独关闭xdp
+#### 2.4.3 先单独关闭xdp程序
 
-- docker容器对外网地址和docker0进行nping-tcp，均失败
+```shell
+sudo ip link set dev veth6c30d72 xdp off
+```
 
-因为主机上的veth口关闭了xdp，所以可以接收docker容器发到该接口或者由该接口转发的数据，因此可以抓包。
+
+
+##### 2.4.3.1 docker容器nping-tcp对外网地址和docker0
+
+docker容器对外网地址和docker0进行nping-tcp，均失败。
+
+主机上的veth口关闭了xdp，所以可以接收docker容器发到该接口或者由该接口转发的数据，因此==可以抓包==。
+
+```shell
+x@zx:~$ route -n#当前路由表
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         10.0.2.2        0.0.0.0         UG    100    0        0 enp0s3
+10.0.2.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s3
+169.254.0.0     0.0.0.0         255.255.0.0     U     1000   0        0 enp0s3
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0######
+
+
+x@zx:~$ sudo ip netns exec httpserver route -n#容器路由表
+[sudo] password for zx: 
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         172.17.0.1      0.0.0.0         UG    0      0        0 eth0
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 eth0
+```
+
+
 
 （1）外网地址
 
+```shell
+x@zx:~$ sudo ip netns exec httpserver sudo nping -c 200 --tcp www.baidu.com
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-23 17:42 CST
+SENT (0.5268s) TCP 172.17.0.2:32750 > 104.193.88.77:80 S ttl=64 id=31271 iplen=40  seq=1526118025 win=1480 
+SENT (1.5272s) TCP 172.17.0.2:32750 > 104.193.88.77:80 S ttl=64 id=31271 iplen=40  seq=1526118025 win=1480 
+SENT (2.5289s) TCP 172.17.0.2:32750 > 104.193.88.77:80 S ttl=64 id=31271 iplen=40  seq=1526118025 win=1480 
+SENT (3.5301s) TCP 172.17.0.2:32750 > 104.193.88.77:80 S ttl=64 id=31271 iplen=40  seq=1526118025 win=1480 
+SENT (4.5315s) TCP 172.17.0.2:32750 > 104.193.88.77:80 S ttl=64 id=31271 iplen=40  seq=1526118025 win=1480 
+SENT (5.5326s) TCP 172.17.0.2:32750 > 104.193.88.77:80 S ttl=64 id=31271 iplen=40  seq=1526118025 win=1480 
+^C 
+Max rtt: N/A | Min rtt: N/A | Avg rtt: N/A
+Raw packets sent: 6 (240B) | Rcvd: 0 (0B) | Lost: 6 (100.00%)
+Nping done: 1 IP address pinged in 6.34 seconds
+
+```
+
 需要继续对外转发，该接口开启了tc egress，会使 tcp 流量被丢弃，无法从该接口出去
+
+
 
 （2）docker0
 
 172.17.0.1，这里docker0会回复容器的nping，该接口开启了tc egress，会使 tcp 流量被丢弃，无法从该接口出去。
 
-这里疑惑的是contrack类似的功能，==并不是，没有关系==，是docker0开启了tc egress tcp drop，和容器无关。
-
-![image-20211123180313156](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123180313156.png)
-
-
-
-- 主机访问docker容器的nginx服务，因为主机的egress是drop tcp的，所以失败
-
 ```shell
-curl -m 5 -vvv   localhost
+x@zx:~$ sudo ip netns exec httpserver sudo nping -c 200 --tcp 172.17.0.1
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-23 17:43 CST
+SENT (0.0329s) TCP 172.17.0.2:5843 > 172.17.0.1:80 S ttl=64 id=26083 iplen=40  seq=2928133642 win=1480 
+SENT (1.0331s) TCP 172.17.0.2:5843 > 172.17.0.1:80 S ttl=64 id=26083 iplen=40  seq=2928133642 win=1480 
+SENT (2.0343s) TCP 172.17.0.2:5843 > 172.17.0.1:80 S ttl=64 id=26083 iplen=40  seq=2928133642 win=1480 
+SENT (3.0350s) TCP 172.17.0.2:5843 > 172.17.0.1:80 S ttl=64 id=26083 iplen=40  seq=2928133642 win=1480 
+SENT (4.0359s) TCP 172.17.0.2:5843 > 172.17.0.1:80 S ttl=64 id=26083 iplen=40  seq=2928133642 win=1480 
+SENT (5.0371s) TCP 172.17.0.2:5843 > 172.17.0.1:80 S ttl=64 id=26083 iplen=40  seq=2928133642 win=1480 
+^C 
+Max rtt: N/A | Min rtt: N/A | Avg rtt: N/A
+Raw packets sent: 6 (240B) | Rcvd: 0 (0B) | Lost: 6 (100.00%)
+Nping done: 1 IP address pinged in 5.43 seconds
+
 ```
 
 
 
-- 主机nping-tcp docker容器的eth0，因为主机的egress是drop tcp的，所以失败，==同样抓不到包==
+这里疑惑的是contrack类似的功能，==并不是，没有关系==，是docker0开启了tc egress tcp drop，丢弃了要返回给容器的nping答复报文，和容器无关。
 
-
-
-- 主机ping docker容器的eth0，因为ping是icmp协议，不是tcp协议，没有配置icmp协议的规则，所以通
-- 同样道理,docker容器可以ping外部：
-
-
-
-###### 再关闭tc
-
-- docker容器对外网地址和docker0进行nping-tcp，均失败
-
-因为主机上的veth口开启了xdp，所以docker容器发到该接口或者由该接口转发的数据，均被丢弃。
-
-==而且tcpdump不能抓到数据。==
+![image-20211123180313156](image-20211123180313156.png)
 
 
 
 
 
-- 主机访问docker容器的nginx服务，因为主机的egress是drop tcp的，所以失败
+##### 2.4.3.2 主机访问docker容器的nginx服务
+
+主机访问docker容器的nginx服务，因为主机的egress是drop tcp的，所以失败
 
 ```shell
-curl -m 5 -vvv   localhost
+zx@zx:~$ curl -m 5 -vvv   localhost
+```
+
+![image-20211124094218805](image-20211124094218805.png)
+
+==同样抓不到包==，参考【2.4.2.2】，为何不能抓包
+
+
+
+
+
+
+
+##### 2.4.3.3 主机nping-tcp docker容器的eth0
+
+主机nping-tcp docker容器的eth0，因为主机的egress是drop tcp的，所以不通，==同样抓不到包==
+
+```shell
+x@zx:~$ sudo nping -c 100 --tcp 172.17.0.2
+[sudo] password for zx: 
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 09:54 CST
+SENT (0.0277s) TCP 172.17.0.1:9801 > 172.17.0.2:80 S ttl=64 id=6382 iplen=40  seq=2753650376 win=1480 
+SENT (1.0278s) TCP 172.17.0.1:9801 > 172.17.0.2:80 S ttl=64 id=6382 iplen=40  seq=2753650376 win=1480 
+SENT (2.0287s) TCP 172.17.0.1:9801 > 172.17.0.2:80 S ttl=64 id=6382 iplen=40  seq=2753650376 win=1480 
+SENT (3.0301s) TCP 172.17.0.1:9801 > 172.17.0.2:80 S ttl=64 id=6382 iplen=40  seq=2753650376 win=1480 
+SENT (4.0314s) TCP 172.17.0.1:9801 > 172.17.0.2:80 S ttl=64 id=6382 iplen=40  seq=2753650376 win=1480 
+SENT (5.0319s) TCP 172.17.0.1:9801 > 172.17.0.2:80 S ttl=64 id=6382 iplen=40  seq=2753650376 win=1480 
+SENT (6.0334s) TCP 172.17.0.1:9801 > 172.17.0.2:80 S ttl=64 id=6382 iplen=40  seq=2753650376 win=1480 
+SENT (7.0347s) TCP 172.17.0.1:9801 > 172.17.0.2:80 S ttl=64 id=6382 iplen=40  seq=2753650376 win=1480 
+^C 
+Max rtt: N/A | Min rtt: N/A | Avg rtt: N/A
+Raw packets sent: 8 (320B) | Rcvd: 0 (0B) | Lost: 8 (100.00%)
+Nping done: 1 IP address pinged in 7.26 seconds
+
+```
+
+与【2.4.2.3】，为何不能抓包
+
+
+
+
+
+##### 2.4.3.4 主机ping docker容器的eth0
+
+主机ping docker容器的eth0，因为ping是icmp协议，不是tcp协议，没有配置icmp协议的规则，所以通
+
+```shell
+x@zx:~$ sudo ping -c 5  172.17.0.2
+PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
+64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.045 ms
+64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.045 ms
+64 bytes from 172.17.0.2: icmp_seq=3 ttl=64 time=0.038 ms
+64 bytes from 172.17.0.2: icmp_seq=4 ttl=64 time=0.039 ms
+^C
+--- 172.17.0.2 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3072ms
+rtt min/avg/max/mdev = 0.038/0.041/0.045/0.003 ms
+zx@zx:~$ 
+zx@zx:~$ 
+zx@zx:~$ sudo nping -c 5 --icmp 172.17.0.2
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 10:00 CST
+SENT (0.0359s) ICMP [172.17.0.1 > 172.17.0.2 Echo request (type=8/code=0) id=64817 seq=1] IP [ttl=64 id=26298 iplen=28 ]
+RCVD (0.0361s) ICMP [172.17.0.2 > 172.17.0.1 Echo reply (type=0/code=0) id=64817 seq=1] IP [ttl=64 id=45024 iplen=28 ]
+SENT (1.0395s) ICMP [172.17.0.1 > 172.17.0.2 Echo request (type=8/code=0) id=64817 seq=2] IP [ttl=64 id=26298 iplen=28 ]
+RCVD (1.0397s) ICMP [172.17.0.2 > 172.17.0.1 Echo reply (type=0/code=0) id=64817 seq=2] IP [ttl=64 id=45249 iplen=28 ]
+^C 
+Max rtt: 0.132ms | Min rtt: 0.130ms | Avg rtt: 0.131ms
+Raw packets sent: 2 (56B) | Rcvd: 2 (56B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 1.91 seconds
+
 ```
 
 
 
-- 主机nping-tcp docker容器的eth0，因为主机的egress是drop tcp的，所以失败，==同样抓不到包==
+
+
+##### 2.4.3.5 docker容器ping外部地址
+
+同样道理,docker容器可以ping外部：
+
+```shell
+x@zx:~$ sudo ip netns exec httpserver sudo nping -c 5 --icmp 172.17.0.1
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 10:02 CST
+SENT (0.0329s) ICMP [172.17.0.2 > 172.17.0.1 Echo request (type=8/code=0) id=63949 seq=1] IP [ttl=64 id=3384 iplen=28 ]
+RCVD (0.0331s) ICMP [172.17.0.1 > 172.17.0.2 Echo reply (type=0/code=0) id=63949 seq=1] IP [ttl=64 id=63272 iplen=28 ]
+
+^C 
+Max rtt: 0.047ms | Min rtt: 0.032ms | Avg rtt: 0.038ms
+Raw packets sent: 3 (84B) | Rcvd: 3 (84B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 2.60 seconds
+zx@zx:~$ sudo ip netns exec httpserver sudo nping -c 5 --icmp www.baidu.com
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 10:02 CST
+SENT (0.5266s) ICMP [172.17.0.2 > 104.193.88.77 Echo request (type=8/code=0) id=40387 seq=1] IP [ttl=64 id=25149 iplen=28 ]
+RCVD (0.7184s) ICMP [104.193.88.77 > 172.17.0.2 Echo reply (type=0/code=0) id=40387 seq=1] IP [ttl=61 id=50790 iplen=28 ]
+
+^C 
+Max rtt: 192.464ms | Min rtt: 191.472ms | Avg rtt: 191.890ms
+Raw packets sent: 3 (84B) | Rcvd: 3 (84B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 3.02 seconds
+
+```
 
 
 
-- 主机ping docker容器的eth0，因为ping是icmp协议，不是tcp协议，没有配置icmp协议的规则，所以通
-- 同样道理,docker容器可以ping外部：
-
-#### [调试你的BPF程序](https://davidlovezoe.club/wordpress/archives/963)
 
 
+#### 2.4.4 再关闭tc程序
+
+```shell
+x@zx:~$ sudo tc qdisc show dev veth6c30d72
+qdisc noqueue 0: root refcnt 2 
+qdisc clsact ffff: parent ffff:fff1 
+zx@zx:~$ 
+zx@zx:~$ tc filter show dev veth6c30d72 egress
+filter protocol all pref 49152 bpf chain 0 
+filter protocol all pref 49152 bpf chain 0 handle 0x1 tc-xdp-drop-tcp.o:[tc] direct-action not_in_hw id 37 tag 2606b497477d080a
+
+zx@zx:~$ sudo tc filter delete dev veth6c30d72 egress#关闭tc程序
+zx@zx:~$ 
+zx@zx:~$ sudo tc qdisc show dev veth6c30d72
+qdisc noqueue 0: root refcnt 2 
+qdisc clsact ffff: parent ffff:fff1 
+zx@zx:~$ 
+zx@zx:~$ tc filter show dev veth6c30d72 egress
+zx@zx:~$ 
+x@zx:~$ ip a
+5: veth6c30d72@if4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default qlen 1000
+    link/ether 16:d9:43:3f:08:72 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::14d9:43ff:fe3f:872/64 scope link 
+       valid_lft forever preferred_lft forever
+
+
+```
+
+
+
+##### 2.4.4.1 docker容器nping-tcp对外网地址和docker0
+
+docker容器对外网地址和docker0进行nping-tcp，均成功
+
+（1）外网地址
+
+```shell
+zx@zx:~$ sudo ip netns exec httpserver sudo nping -c 200 --tcp www.baidu.com
+[sudo] password for zx: 
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 10:14 CST
+SENT (0.5272s) TCP 172.17.0.2:48169 > 103.235.46.39:80 S ttl=64 id=11068 iplen=40  seq=1903093559 win=1480 
+RCVD (0.5688s) TCP 103.235.46.39:80 > 172.17.0.2:48169 SA ttl=63 id=50800 iplen=44  seq=811328001 win=65535 <mss 1460>
+
+^C 
+Max rtt: 42.915ms | Min rtt: 39.111ms | Avg rtt: 41.169ms
+Raw packets sent: 3 (120B) | Rcvd: 3 (132B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 3.18 seconds
+
+```
+
+![image-20211124101525343](image-20211124101525343.png)
+
+（2）docker0
+
+```
+x@zx:~$ sudo ip netns exec httpserver sudo nping -c 200 --tcp 172.17.0.1
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 10:17 CST
+SENT (0.0418s) TCP 172.17.0.2:44922 > 172.17.0.1:80 S ttl=64 id=54789 iplen=40  seq=4081847795 win=1480 
+RCVD (0.0421s) TCP 172.17.0.1:80 > 172.17.0.2:44922 SA ttl=64 id=0 iplen=44  seq=80718525 win=64240 <mss 1460>
+SENT (1.0423s) TCP 172.17.0.2:44922 > 172.17.0.1:80 S ttl=64 id=54789 iplen=40  seq=4081847795 win=1480 
+RCVD (1.0425s) TCP 172.17.0.1:80 > 172.17.0.2:44922 SA ttl=64 id=0 iplen=44  seq=96350485 win=64240 <mss 1460>
+^C 
+Max rtt: 0.164ms | Min rtt: 0.044ms | Avg rtt: 0.104ms
+Raw packets sent: 2 (80B) | Rcvd: 2 (88B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 1.68 seconds
+
+```
+
+![image-20211124101817246](image-20211124101817246.png)
+
+
+
+##### 2.4.4.2 主机访问docker容器的nginx服务
+
+主机访问docker容器的nginx服务，成功
+
+```shell
+x@zx:~$ curl -m 5 -vvv   localhost
+*   Trying 127.0.0.1:80...
+* TCP_NODELAY set
+* Connected to localhost (127.0.0.1) port 80 (#0)
+> GET / HTTP/1.1
+> Host: localhost
+> User-Agent: curl/7.68.0
+> Accept: */*
+> 
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< Server: nginx/1.21.4
+< Date: Wed, 24 Nov 2021 02:24:42 GMT
+< Content-Type: text/html
+< Content-Length: 615
+< Last-Modified: Tue, 02 Nov 2021 15:07:50 GMT
+< Connection: keep-alive
+< ETag: "61815446-267"
+< Accept-Ranges: bytes
+< 
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+* Connection #0 to host localhost left intact
+
+```
+
+
+
+##### 2.4.4.3 主机nping-tcp docker容器的eth0
+
+主机nping-tcp docker容器的eth0，成功
+
+```shell
+x@zx:~$ sudo nping -c 100 --tcp 172.17.0.2
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 10:25 CST
+SENT (0.0304s) TCP 172.17.0.1:35236 > 172.17.0.2:80 S ttl=64 id=607 iplen=40  seq=1257743241 win=1480 
+RCVD (0.0309s) TCP 172.17.0.2:80 > 172.17.0.1:35236 SA ttl=64 id=0 iplen=44  seq=813594081 win=64240 <mss 1460>
+SENT (1.0310s) TCP 172.17.0.1:35236 > 172.17.0.2:80 S ttl=64 id=607 iplen=40  seq=1257743241 win=1480 
+RCVD (1.0312s) TCP 172.17.0.2:80 > 172.17.0.1:35236 SA ttl=64 id=0 iplen=44  seq=829226415 win=64240 <mss 1460>
+^C 
+Max rtt: 0.132ms | Min rtt: 0.047ms | Avg rtt: 0.089ms
+Raw packets sent: 2 (80B) | Rcvd: 2 (88B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 1.55 seconds
+
+```
+
+
+
+##### 2.4.4.4 主机ping docker容器的eth0
+
+```shell
+x@zx:~$ sudo ping -c 5  172.17.0.2
+PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
+64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.033 ms
+64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.037 ms
+^C
+--- 172.17.0.2 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1027ms
+rtt min/avg/max/mdev = 0.033/0.035/0.037/0.002 ms
+zx@zx:~$ sudo nping -c 5 --icmp 172.17.0.2
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 10:26 CST
+SENT (0.0358s) ICMP [172.17.0.1 > 172.17.0.2 Echo request (type=8/code=0) id=15214 seq=1] IP [ttl=64 id=62068 iplen=28 ]
+RCVD (0.0373s) ICMP [172.17.0.2 > 172.17.0.1 Echo reply (type=0/code=0) id=15214 seq=1] IP [ttl=64 id=30477 iplen=28 ]
+^C 
+Max rtt: 0.283ms | Min rtt: 0.283ms | Avg rtt: 0.283ms
+Raw packets sent: 1 (28B) | Rcvd: 1 (28B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 0.82 seconds
+
+```
+
+
+
+##### 2.4.4.5 docker容器ping外部地址
+
+```shell
+x@zx:~$ sudo ip netns exec httpserver sudo nping -c 5 --icmp 172.17.0.1
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 10:27 CST
+SENT (0.0323s) ICMP [172.17.0.2 > 172.17.0.1 Echo request (type=8/code=0) id=63197 seq=1] IP [ttl=64 id=33493 iplen=28 ]
+RCVD (0.0325s) ICMP [172.17.0.1 > 172.17.0.2 Echo reply (type=0/code=0) id=63197 seq=1] IP [ttl=64 id=52024 iplen=28 ]
+^C 
+Max rtt: 0.046ms | Min rtt: 0.029ms | Avg rtt: 0.036ms
+Raw packets sent: 3 (84B) | Rcvd: 3 (84B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 2.59 seconds
+zx@zx:~$ sudo ip netns exec httpserver sudo nping -c 5 --icmp www.baidu.com
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 10:27 CST
+SENT (0.5246s) ICMP [172.17.0.2 > 104.193.88.77 Echo request (type=8/code=0) id=16458 seq=1] IP [ttl=64 id=58114 iplen=28 ]
+RCVD (0.7162s) ICMP [104.193.88.77 > 172.17.0.2 Echo reply (type=0/code=0) id=16458 seq=1] IP [ttl=61 id=50841 iplen=28 ]
+
+^C 
+Max rtt: 194.344ms | Min rtt: 191.618ms | Avg rtt: 192.774ms
+Raw packets sent: 3 (84B) | Rcvd: 3 (84B) | Lost: 0 (0.00%)
+Nping done: 1 IP address pinged in 2.78 seconds
+
+```
+
+
+
+## [调试你的BPF程序](https://davidlovezoe.club/wordpress/archives/963)
 
 
 
 
 
-[编译运行LINUX内核源码中的BPF示例代码](https://davidlovezoe.club/wordpress/archives/988)
+
+
+## [编译运行LINUX内核源码中的BPF示例代码](https://davidlovezoe.club/wordpress/archives/988)
 

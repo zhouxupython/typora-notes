@@ -132,7 +132,13 @@ zx@zx:~/works/ebpf/src_from_github/linux-bpf-learning/tc$ curl localhost
 
 没有启用xdp程序时，可以在docker外部通过curl命令获取docker-nginx的服务
 
-![image-20211123094650419](/home/zhouxu/works/notes/typora-notes/bpf_read/experiments/image-20211123094650419.png)
+![image-20211123094650419](./image-20211123094650419.png)
+
+
+
+
+
+
 
 #### 1.2.2 启动xdp程序
 
@@ -210,7 +216,7 @@ zx@zx:~/works/ebpf/src_from_github/linux-bpf-learning/tc$ curl localhost
 
 
 
-![image-20211123103837042](image-20211123103837042.png)
+![image-20211123103837042](./image-20211123103837042.png)
 
 #### 1.2.3 关闭xdp程序
 
@@ -219,7 +225,7 @@ zx@zx:~/works/ebpf/src_from_github/linux-bpf-learning/tc$ curl localhost
 zx@zx:~/works/ebpf/src_from_github/linux-bpf-learning/tc$ sudo ip link set dev veth0afb74f xdp off
 ```
 
-![image-20211123104454150](image-20211123104454150.png)
+![image-20211123104454150](./image-20211123104454150.png)
 
 
 
@@ -449,7 +455,7 @@ Nping done: 1 IP address pinged in 33.68 seconds
 
 ```
 
-![image-20211123141133282](image-20211123141133282.png)
+![image-20211123141133282](./image-20211123141133282.png)
 
 
 
@@ -457,11 +463,11 @@ Nping done: 1 IP address pinged in 33.68 seconds
 
 如图，容器通过docker0访问外网，配对的veth上开启了xdp，丢弃tcp数据，那么此时容器发出的nping-tcp就被丢弃了。
 
-![image-20211123153200021](image-20211123153200021.png)
+![image-20211123153200021](./image-20211123153200021.png)
 
 
 
-![image-20211123151820047](image-20211123151820047.png)
+![image-20211123151820047](./image-20211123151820047.png)
 
 
 
@@ -469,7 +475,7 @@ Nping done: 1 IP address pinged in 33.68 seconds
 
 ### 2.3 反复开启、关闭xdp程序访问配对的veth
 
-![image-20211123154242780](image-20211123154242780.png)
+![image-20211123154242780](./image-20211123154242780.png)
 
 
 
@@ -535,7 +541,7 @@ docker容器对外网地址和docker0进行nping-tcp，均失败。
 
 （2）docker0
 
-![image-20211123170040745](image-20211123170040745.png)
+![image-20211123170040745](./image-20211123170040745.png)
 
 
 
@@ -551,13 +557,13 @@ curl -m 5 -vvv   localhost
 
 
 
-![image-20211123170930224](image-20211123170930224.png)
+![image-20211123170930224](./image-20211123170930224.png)
 
 
 
 ==那如何解释此处抓包也抓不到呢？==
 
-![image-20211123171948700](image-20211123171948700.png)
+![image-20211123171948700](./image-20211123171948700.png)
 
 
 
@@ -746,7 +752,7 @@ Nping done: 1 IP address pinged in 5.43 seconds
 
 这里疑惑的是contrack类似的功能，==并不是，没有关系==，是docker0开启了tc egress tcp drop，丢弃了要返回给容器的nping答复报文，和容器无关。
 
-![image-20211123180313156](image-20211123180313156.png)
+![image-20211123180313156](./image-20211123180313156.png)
 
 
 
@@ -760,7 +766,7 @@ Nping done: 1 IP address pinged in 5.43 seconds
 zx@zx:~$ curl -m 5 -vvv   localhost
 ```
 
-![image-20211124094218805](image-20211124094218805.png)
+![image-20211124094218805](./image-20211124094218805.png)
 
 ==同样抓不到包==，参考【2.4.2.2】，为何不能抓包
 
@@ -918,7 +924,7 @@ Nping done: 1 IP address pinged in 3.18 seconds
 
 ```
 
-![image-20211124101525343](image-20211124101525343.png)
+![image-20211124101525343](./image-20211124101525343.png)
 
 （2）docker0
 
@@ -937,7 +943,7 @@ Nping done: 1 IP address pinged in 1.68 seconds
 
 ```
 
-![image-20211124101817246](image-20211124101817246.png)
+![image-20211124101817246](./image-20211124101817246.png)
 
 
 

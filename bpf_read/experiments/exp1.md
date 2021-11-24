@@ -871,6 +871,32 @@ Nping done: 1 IP address pinged in 3.02 seconds
 
 
 
+##### 2.4.3.6 主机nping-tcp自己的ip地址
+
+```shell
+x@zx:~$ sudo nping -c 100 --tcp 172.17.0.1
+
+Starting Nping 0.7.80 ( https://nmap.org/nping ) at 2021-11-24 14:13 CST
+SENT (0.0478s) TCP 10.0.2.15:48299 > 172.17.0.1:80 S ttl=64 id=22560 iplen=40  seq=2592198885 win=1480 
+SENT (1.0481s) TCP 10.0.2.15:48299 > 172.17.0.1:80 S ttl=64 id=22560 iplen=40  seq=2592198885 win=1480 
+SENT (2.0493s) TCP 10.0.2.15:48299 > 172.17.0.1:80 S ttl=64 id=22560 iplen=40  seq=2592198885 win=1480 
+SENT (3.0505s) TCP 10.0.2.15:48299 > 172.17.0.1:80 S ttl=64 id=22560 iplen=40  seq=2592198885 win=1480 
+SENT (4.0517s) TCP 10.0.2.15:48299 > 172.17.0.1:80 S ttl=64 id=22560 iplen=40  seq=2592198885 win=1480 
+SENT (5.0529s) TCP 10.0.2.15:48299 > 172.17.0.1:80 S ttl=64 id=22560 iplen=40  seq=2592198885 win=1480 
+SENT (6.0531s) TCP 10.0.2.15:48299 > 172.17.0.1:80 S ttl=64 id=22560 iplen=40  seq=2592198885 win=1480 
+SENT (7.0543s) TCP 10.0.2.15:48299 > 172.17.0.1:80 S ttl=64 id=22560 iplen=40  seq=2592198885 win=1480 
+^C 
+Max rtt: N/A | Min rtt: N/A | Avg rtt: N/A
+Raw packets sent: 8 (320B) | Rcvd: 0 (0B) | Lost: 8 (100.00%)
+Nping done: 1 IP address pinged in 7.88 seconds
+```
+
+
+
+抓tcp类型的包，抓不到；
+
+`sudo tcpdump -i veth6c30d72 -vv -nn` 也抓不到
+
 
 
 #### 2.4.4 再关闭tc程序

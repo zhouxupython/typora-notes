@@ -1122,7 +1122,7 @@ Nping done: 1 IP address pinged in 2.78 seconds
 
 
 
-## [调试你的BPF程序](https://davidlovezoe.club/wordpress/archives/963)
+## 2. [调试你的BPF程序](https://davidlovezoe.club/wordpress/archives/963)
 
 
 
@@ -1130,5 +1130,5 @@ Nping done: 1 IP address pinged in 2.78 seconds
 
 
 
-## [编译运行LINUX内核源码中的BPF示例代码](https://davidlovezoe.club/wordpress/archives/988)
+## 3. [编译运行LINUX内核源码中的BPF示例代码](https://davidlovezoe.club/wordpress/archives/988)
 

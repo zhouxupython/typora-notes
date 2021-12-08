@@ -184,3 +184,14 @@ while (1)
 }
 ```
 
+
+
+------
+
+BCC中的map定义
+
+```c
+// 定义HASH_MAP，使用 BCC 宏定义，key 为 u64 类型，value 为 struct val_t 结构；
+BPF_HASH(infotmp, u64, struct val_t);
+```
+

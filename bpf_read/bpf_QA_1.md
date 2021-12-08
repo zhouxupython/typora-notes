@@ -205,3 +205,24 @@ tcpdump抓包的钩子点，与xdp、tc的钩子点比较
 ------
 
 既然上面这样，那么如何通过代码证明xdp过滤包的效率更高？自己分析这部分的性能，就用bpf提供的工具
+
+------
+
+ebpf的map类型，内部是什么区别，优劣区分？比如如下两种
+
+BPF_MAP_TYPE_HASH,
+
+BPF_MAP_TYPE_ARRAY,
+
+均有key、value
+
+```c
+//samples/bpf/sockex1_kern.c
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, u32);
+	__type(value, long);
+	__uint(max_entries, 256);
+} my_map SEC(".maps");
+```
+

@@ -6,7 +6,9 @@ https://github.com/iovisor/bcc/blob/master/docs/tutorial_bcc_python_developer.md
 
 https://github.com/iovisor/bcc/blob/b209161fd7cacd03fd082ce3c0af89cfa652792d/docs/reference_guide.md
 
+https://github.com/iovisor/bcc/blob/master/docs/reference_guide.md#bpf-c
 
+https://github.com/iovisor/bcc/blob/master/docs/reference_guide.md#bcc-python
 
 ## 四篇对比
 
@@ -14,7 +16,7 @@ https://github.com/iovisor/bcc/blob/b209161fd7cacd03fd082ce3c0af89cfa652792d/doc
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | [【BPF入门系列-7】使用 ebpf 实时持续跟踪进程文件记录](https://www.ebpf.top/post/ebpf_trace_file_open/) | `bpf_trace_printk`：内核空间打印，只能支持3 个参数，而且只运行一个 %s，追踪函数==共享输出==<br/>`b.trace_print`：用户空间读取上面的输出<br/><br/>`b.attach_kprobe`：==追踪入口，关联钩子函数，获取入参==<br/>`b.attach_kretprobe`：==追踪出口，关联钩子函数，获取结果值==<br/> |
 | [【BPF入门系列-8】文件打开记录跟踪之 perf_event 篇](https://www.ebpf.top/post/ebpf_trace_file_open_perf_output/) | <font title="gray">K</font>：<br/>`event_data_t`：自定义结构体，用于K-U通信，且不存在参数数量和数据大小等限制<br/>`BPF_PERF_OUTPUT`(==open_events==)用于追踪函数之间的==隔离==，以及向用户空间==发布==event_data_t<br/>`open_events.perf_submit`用于将 event_data_t 数据==发送==至用户空间<br/><br/><br/><font title="gray">U</font>：<br/>b["==open_events=="].`open_perf_buffer`(<font style="background-color:#8bc34a">print_event</font>)：将用户空间接收的数据与数据的处理函数(print_event)==关联==起来<br/>`b.perf_buffer_poll`：==轮询==，有数据就使用处理函数(<font style="background-color:#8bc34a">print_event</font>)进行处理<br/>b["==open_events=="].`event`(data):从data中还原出钩子函数中定义的结构体event_data_t |
-| [【BPF入门系列-9】文件打开记录结果跟踪篇](https://www.ebpf.top/post/ebpf_trace_file_return) | `BPF_HASH(map, k_type, v_type)`：定义ebpf HASH_MAP<br/>ebpf hash-map c语言版操作函数`update`、`lookup`、`delete`<br/>`bpf_probe_read(dst, dst_len, src)`：安全的strncpy<br/>`bpf_get_current_comm(dst, dst_len)`：读取当前进程的 commandline 至dst中存储<br/>`PT_REGS_RC`：从 ctx 字段中读取本次函数跟踪的返回值 |
+| [【BPF入门系列-9】文件打开记录结果跟踪篇](https://www.ebpf.top/post/ebpf_trace_file_return) | `BPF_HASH(map, k_type, v_type)`：定义ebpf HASH_MAP<br/>ebpf hash-map c语言版操作函数`update`、`lookup`、`delete`、`increment`<br/>`bpf_probe_read(dst, dst_len, src)`：安全的strncpy<br/>`bpf_get_current_comm(dst, dst_len)`：读取当前进程的 commandline 至dst中存储<br/>`PT_REGS_RC`：从 ctx 字段中读取本次函数跟踪的返回值 |
 | [【BPF入门系列-10】使用 tracepoint 跟踪文件 open 系统调用](https://www.ebpf.top/post/open_tracepoint_trace/) | ==/sys/kernel/debug/tracing/events/syscalls/sys_enter_open/format==<br/>`TRACEPOINT_PROBE(category, event)`：category 就是子系统，event 代表事件名，比如（syscalls, sys_enter_open）<br/>==args==代替ctx参数和其他入参：`args->filename` <br/><br/><br/> |
 |                                                              |                                                              |
 | [【BPF入门系列-11】使用 eBPF 技术跟踪 Netfilter 数据流过滤结果](https://www.ebpf.top/post/iptalbes_ebpf/) | bpf_ktime_get_ns<br/>b.kprobe_poll(1)<br/>BPF_STACK_TRACE(stacks, 2048);<br/>stacks.get_stackid(ctx, 0)<br/>PT_REGS_IP(ctx)<br/>stack_traces = b.get_table("stacks")<br/>kernel_tmp = stack_traces.walk(event.kernel_stack_id)<br/> |

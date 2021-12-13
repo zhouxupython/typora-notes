@@ -1,13 +1,13 @@
 ### BPF_PERF_OUTPUT
 
 ```c
-BPF_PERF_OUTPUT(open_events);
+BPF_PERF_OUTPUT(open_events);//定义
 
-open_events.perf_submit(ctx, &evt, sizeof(evt));
+open_events.perf_submit(ctx, &evt, sizeof(evt));//K空间发送数据到“open_events”对应的缓冲区
 
-event = b["open_events"].event(data)
+b["open_events"].open_perf_buffer(print_event)//U空间打开“open_events”对应的缓冲区
     
-b["open_events"].open_perf_buffer(print_event)
+event = b["open_events"].event(data)//获取到K空间发来的“open_events”对应的缓冲区中的数据
 ```
 
 <font title="gray">K</font>：
@@ -30,8 +30,6 @@ b["==open_events=="].`event`(data):从data中还原出钩子函数中定义的�
 
 ### 钩子命名约定
 
-
-
 还有一种简便的使用方式，声明函数的时候使用特定的前缀和函数名，此种约定就可以省略 `b.attach_kprobe` 显示的使用，例如：
 
 ```python
@@ -52,15 +50,15 @@ int syscall__open(struct pt_regs *ctx, const char __user *filename, int flags) {
 ### BPF_HASH
 
 ```c
-// 定义HASH_MAP，使用 BCC 宏定义，key 为 u64 类型，value 为 struct val_t 结构；
+// 定义HASH_MAP，使用 BCC 宏定义，就是map，key 为 u64 类型，value 为 struct val_t 结构；
 BPF_HASH(infotmp, u64, struct val_t);
 
 infotmp.update(&id, &val);  // 保存中间结果至 hash_map 中,以 id 为 key，将 val 对象结果保存至 infotmp 中；
 
 // 用于读取在map中保存的信息，如果未查询到则直接返回，
 // 需要注意的是 lookup 函数的入参和出参都是指针类型，使用前需要判断；
-valp = infotmp.lookup(&id); // 从 hash_map 中获取到  sys_open 函数保存的中间数据
-if (valp == 0) {
+valp = infotmp.lookup(&id); // infotmp[id]， 从 hash_map 中获取到  sys_open 函数保存的中间数据
+if (valp == 0) {//没有找到
     // missed entry
     return 0;
 }
@@ -69,6 +67,51 @@ infotmp.delete(&id);  // 删除这个k-v pair
 ```
 
 
+
+### BPF_ARRAY
+
+```c
+// 定义ARRAY_MAP，使用 BCC 宏定义，不能用map观点，就是个数组，每个元素是u64类型，数组大小256
+BPF_ARRAY(count_map, u64, 256);
+
+int count_packets(struct __sk_buff *skb)
+{
+    int index = load_byte(skb, ETH_HLEN + offsetof(struct iphdr, protocol));
+    
+    //这个是类似于arr[index]，但是返回的不是对应的数据，而是&arr[index]
+    u64 *val = count_map.lookup(&index);
+    if(val)//如果index超出数组大小，那么返回空指针
+        count_map.increment(index);
+    return 0;
+}
+```
+
+U中使用：
+
+```python
+# bpf["count_map"]获取到这个array
+# bpf["count_map"][socket.IPPROTO_TCP]类似于arr[index]，U空间不再是&arr[index]，而是真正这个元素的值
+# .value表示ctypes.c_ulong 类型转化为int
+TCP_cnt = bpf["count_map"][socket.IPPROTO_TCP].value
+```
+
+
+
+如果是array类型的映射，那么可以使用==__sync_fetch_and_add==对数组的元素值进行原子计算
+
+```c
+//samples/bpf/sockex1_kern.c
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, u32);
+	__type(value, long);
+	__uint(max_entries, 256);
+} my_map SEC(".maps");
+
+value = bpf_map_lookup_elem(&my_map, &index);
+	if (value)
+		__sync_fetch_and_add(value, skb->len);//对应的数组元素值增加skb->len
+```
 
 
 
@@ -129,3 +172,37 @@ b.attach_kprobe(event=b.get_syscall_fnname("open"), fn_name="trace_syscall_open"
 
 
 ### BPF_STACK_TRACE
+
+### PT_REGS_PARMn
+
+```c
+// int openat(int dirfd, const char *pathname, int flags);
+KRETFUNC_PROBE(__x64_sys_openat, struct pt_regs *regs, int ret)
+{
+    int dfd = PT_REGS_PARM1(regs);//int dirfd
+    const char __user *filename = (char *)PT_REGS_PARM2(regs);//const char *pathname
+    //int flags = PT_REGS_PARM3(regs);//int flags
+
+
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+    u32 tid = id;       // Cast and get the lower part
+    u32 uid = bpf_get_current_uid_gid();
+
+    struct data_t data = {};
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+
+    u64 tsp = bpf_ktime_get_ns();
+
+    bpf_probe_read_user(&data.fname, sizeof(data.fname), (void *)filename);
+    data.id    = id;
+    data.ts    = tsp / 1000;
+    data.uid   = bpf_get_current_uid_gid();
+    data.ret   = ret;
+
+    events.perf_submit(ctx, &data, sizeof(data));
+
+    return 0;
+}
+```
+

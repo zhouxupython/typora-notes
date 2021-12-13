@@ -18,8 +18,11 @@ https://github.com/iovisor/bcc/blob/master/docs/reference_guide.md#bcc-python
 | [【BPF入门系列-8】文件打开记录跟踪之 perf_event 篇](https://www.ebpf.top/post/ebpf_trace_file_open_perf_output/) | <font title="gray">K</font>：<br/>`event_data_t`：自定义结构体，用于K-U通信，且不存在参数数量和数据大小等限制<br/>`BPF_PERF_OUTPUT`(==open_events==)用于追踪函数之间的==隔离==，以及向用户空间==发布==event_data_t<br/>`open_events.perf_submit`用于将 event_data_t 数据==发送==至用户空间<br/><br/><br/><font title="gray">U</font>：<br/>b["==open_events=="].`open_perf_buffer`(<font style="background-color:#8bc34a">print_event</font>)：将用户空间接收的数据与数据的处理函数(print_event)==关联==起来<br/>`b.perf_buffer_poll`：==轮询==，有数据就使用处理函数(<font style="background-color:#8bc34a">print_event</font>)进行处理<br/>b["==open_events=="].`event`(data):从data中还原出钩子函数中定义的结构体event_data_t |
 | [【BPF入门系列-9】文件打开记录结果跟踪篇](https://www.ebpf.top/post/ebpf_trace_file_return) | `BPF_HASH(map, k_type, v_type)`：定义ebpf HASH_MAP<br/>ebpf hash-map c语言版操作函数`update`、`lookup`、`delete`、`increment`<br/>`bpf_probe_read(dst, dst_len, src)`：安全的strncpy<br/>`bpf_get_current_comm(dst, dst_len)`：读取当前进程的 commandline 至dst中存储<br/>`PT_REGS_RC`：从 ctx 字段中读取本次函数跟踪的返回值 |
 | [【BPF入门系列-10】使用 tracepoint 跟踪文件 open 系统调用](https://www.ebpf.top/post/open_tracepoint_trace/) | ==/sys/kernel/debug/tracing/events/syscalls/sys_enter_open/format==<br/>`TRACEPOINT_PROBE(category, event)`：category 就是子系统，event 代表事件名，比如（syscalls, sys_enter_open）<br/>==args==代替ctx参数和其他入参：`args->filename` <br/><br/><br/> |
-|                                                              |                                                              |
+| [KRETFUNC_PROBE](https://github.com/iovisor/bcc/blob/b209161fd7cacd03fd082ce3c0af89cfa652792d/docs/reference_guide.md#10-kretfuncs) | ==tools/opensnoop.py==<br/>`KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)`<br/>FNNAME:例如  __x64_sys_openat<br/>ret：例如openat函数的返回值，即fd |
+| [KFUNC_PROBE](https://github.com/iovisor/bcc/blob/b209161fd7cacd03fd082ce3c0af89cfa652792d/docs/reference_guide.md#9-kfuncs) |                                                              |
 | [【BPF入门系列-11】使用 eBPF 技术跟踪 Netfilter 数据流过滤结果](https://www.ebpf.top/post/iptalbes_ebpf/) | bpf_ktime_get_ns<br/>b.kprobe_poll(1)<br/>BPF_STACK_TRACE(stacks, 2048);<br/>stacks.get_stackid(ctx, 0)<br/>PT_REGS_IP(ctx)<br/>stack_traces = b.get_table("stacks")<br/>kernel_tmp = stack_traces.walk(event.kernel_stack_id)<br/> |
+| [【译】eBPF 概述：第 3 部分：软件开发生态](https://www.ebpf.top/post/ebpf-overview-part-3/) | bpf = BPF(text=c_ebpf)<br/>ffilter = bpf.load_func("probe", BPF.SOCKET_FILTER)<br/>BPF.attach_raw_socket(ffilter, "lo")<br/><br/><br/>这个场景可以使用map传递数据到U，是因为协议类型总数是固定的，可以用数组大小表示，每个位置表示一种协议，元素大小就是对应协议的统计值，数组自身并不会变化，变化的是数组元素的值。<br/>但是上面这个open的统计，使用的是map类型，是动态更改的，打印统计值之后，这个k-v对 就要剔除掉，并不会保留，所以map内容是动态变化的，并不方便将map传递到U<br/>`BPF_ARRAY(count_map, u64, 256)`;定义<br/>count_map.increment(index);K增删改<br/>bpf["count_map"] [socket.IPPROTO_TCP].value;U查 |
+|                                                              |                                                              |
 |                                                              |                                                              |
 |                                                              |                                                              |
 |                                                              | <font style="background-color:#7bc3ff"></font>               |
@@ -472,4 +475,64 @@ def print_stack(event):
 
 
 
+
+### [【译】eBPF 概述：第 3 部分：软件开发生态](https://www.ebpf.top/post/ebpf-overview-part-3/)
+
+- 这个场景可以使用map传递数据到U，是因为协议类型总数是==固定的==，可以用数组大小表示，每个位置表示一种协议，元素大小就是对应协议的统计值，数组自身并不会变化，变化的是数组元素的值。
+
+但是上面这个open的统计，使用的是map类型，是动态更改的，打印统计值之后，这个k-v对 就要剔除掉，并不会保留，所以map内容是==动态变化的==，并不方便将map传递到U。
+
+- 这个没有使用attach_kprobe是因为并不是将钩子挂到某个函数上，而是挂到loopback这个dev上，所以使用了attach_raw_socket
+
+```python
+#!/usr/bin/python3
+from bcc import BPF
+import time, socket
+
+c_ebpf = """
+
+#include <uapi/linux/if_ether.h>
+#include <uapi/linux/ip.h>
+
+BPF_ARRAY(count_map, u64, 256);
+
+int count_packets(struct __sk_buff *skb)
+{
+    int index = load_byte(skb, ETH_HLEN + offsetof(struct iphdr, protocol));
+    u64 *val = count_map.lookup(&index);
+    if(val)
+        count_map.increment(index);
+    return 0;
+}
+
+"""
+
+bpf = BPF(text=c_ebpf)
+ffilter = bpf.load_func("count_packets", BPF.SOCKET_FILTER)
+BPF.attach_raw_socket(ffilter, "lo")
+for i in range(99999):
+    TCP_cnt = bpf["count_map"][socket.IPPROTO_TCP].value
+    UDP_cnt = bpf["count_map"][socket.IPPROTO_UDP].value
+    ICMP_cnt = bpf["count_map"][socket.IPPROTO_ICMP].value
+
+    print("TCP: {0}, UDP: {1}, ICMP: {2}".format(TCP_cnt, UDP_cnt, ICMP_cnt))
+
+    time.sleep(1)
+
+
+
+"""
+sudo nping -c 1  --icmp  --ttl 10 localhost
+TCP: 0, UDP: 0, ICMP: 4
+
+
+sudo nping -c 1  --tcp  --ttl 10 localhost
+TCP: 4, UDP: 0, ICMP: 0
+
+
+sudo nping -c 1  --udp  --ttl 10 localhost
+TCP: 0, UDP: 2, ICMP: 2
+
+"""
+```
 

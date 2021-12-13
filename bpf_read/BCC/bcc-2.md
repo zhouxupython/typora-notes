@@ -197,6 +197,59 @@ int main(int ac, char **argv)
 
 BCC版本实现
 
+```python
+#!/usr/bin/python3
+from bcc import BPF
+import time, socket
+
+c_ebpf = """
+
+#include <uapi/linux/if_ether.h>
+#include <uapi/linux/ip.h>
+
+BPF_ARRAY(count_map, u64, 256);
+
+int count_packets(struct __sk_buff *skb)
+{
+    int index = load_byte(skb, ETH_HLEN + offsetof(struct iphdr, protocol));
+    u64 *val = count_map.lookup(&index);
+    if(val)
+        count_map.increment(index);
+    return 0;
+}
+
+"""
+
+bpf = BPF(text=c_ebpf)
+ffilter = bpf.load_func("count_packets", BPF.SOCKET_FILTER)
+BPF.attach_raw_socket(ffilter, "lo")
+for i in range(99999):
+    TCP_cnt = bpf["count_map"][socket.IPPROTO_TCP].value
+    UDP_cnt = bpf["count_map"][socket.IPPROTO_UDP].value
+    ICMP_cnt = bpf["count_map"][socket.IPPROTO_ICMP].value
+
+    print("TCP: {0}, UDP: {1}, ICMP: {2}".format(TCP_cnt, UDP_cnt, ICMP_cnt))
+
+    time.sleep(1)
+
+
+"""
+sudo nping -c 1  --icmp  --ttl 10 localhost
+TCP: 0, UDP: 0, ICMP: 4
+
+
+sudo nping -c 1  --tcp  --ttl 10 localhost
+TCP: 4, UDP: 0, ICMP: 0
+
+
+sudo nping -c 1  --udp  --ttl 10 localhost
+TCP: 0, UDP: 2, ICMP: 2
+
+"""
+```
+
+
+
 ![](sock_example_bcc版本实现.jpg)
 
 

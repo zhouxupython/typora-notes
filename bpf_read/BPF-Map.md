@@ -2,18 +2,35 @@
 
 ## API对比
 
-|         | kernel                                                       | user                                                         |      |
-| ------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ---- |
-| 创建map | 1. struct {} `my_map` SEC("maps") <br/>2. sys_bpf(BPF_MAP_CREATE, ...？？？？？ | 1. int `map_fd` = bpf(BPF_MAP_CREATE, ...<br/>2. `map_fd` = bpf_create_map(BPF_MAP_TYPE_x, sizeof(key), sizeof(value), 256, 0); |      |
-| map fd  | K可以直接使用 `my_map`<br/>或者**全局变量**map_fd[n].fd      | struct bpf_object *obj;<br/>int map_fd, prog_fd;<br/>bpf_prog_load("xxx_kern.o", BPF_PROG_TYPE_xxx, &*obj, &prog_fd)<br/>`map_fd` = bpf_object__find_map_fd_by_name(obj, "`my_map`"); |      |
-| 查找    | bpf_map_lookup_elem(&map, key)<br/>//返回查找结果的指针，为空表示不存在 | bpf_map_lookup_elem(map_fd, &k, &v);<br/>//返回值0表示查找成功 |      |
-| 插入    | bpf_map_update_elem(&map, key, &val, BPF_NOEXIST)            | int `bpf_map_update_elem`(int fd, const void *key, const void *value, __u64 flags); |      |
-| 遍历    |                                                              | bpf_map_get_next_key(map_fd, &k1, &k2)<br/>//返回为-1表示遍历结束 |      |
-|         |                                                              |                                                              |      |
-|         |                                                              |                                                              |      |
-|         |                                                              |                                                              |      |
-|         |                                                              |                                                              |      |
-|         | &map, 是**struct** bpf_map_def SEC("maps")  `map` = {}       |                                                              |      |
+|         | kernel                                                       | user                                                         |
+| ------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| 创建map | 1. struct {} `my_map` ***SEC***("maps") <br/>2. sys_bpf(BPF_MAP_CREATE, ...？？？？？ | 1. int `map_fd` = ***bpf***(BPF_MAP_CREATE, ...<br/>2. `map_fd` = ***bpf_create_map***(BPF_MAP_TYPE_x, sizeof(key), sizeof(value), 256, 0); |
+| map fd  | K可以直接使用 `my_map`<br/>或者**全局变量**==map_fd==[n].*fd* | struct bpf_object *obj;<br/>int map_fd, prog_fd;<br/>**bpf_prog_load**("xxx_kern.o", BPF_PROG_TYPE_xxx, &*obj, &prog_fd)<br/>`map_fd` = ***bpf_object__find_map_fd_by_name***(obj, "`my_map`"); |
+| 查找    | ***bpf_map_lookup_elem***(&map, key)<br/>//返回查找结果的指针，为空表示不存在 | ***bpf_map_lookup_elem***(map_fd, &k, &v);<br/>//返回值0表示查找成功 |
+| 插入    | ***bpf_map_update_elem***(&map, key, &val, BPF_NOEXIST)      | int ***bpf_map_update_elem***(int fd, const void *key, const void *value, __u64 flags); |
+| 遍历    |                                                              | ***bpf_map_get_next_key***(map_fd, &k1, &k2)<br/>//返回为-1表示遍历结束 |
+| 删除    |                                                              |                                                              |
+|         |                                                              |                                                              |
+|         |                                                              |                                                              |
+|         |                                                              |                                                              |
+|         |                                                              |                                                              |
+|         |                                                              | bpf_object * bpf_object__open_file(const char *path, const struct bpf_object_open_opts *opts); |
+|         |                                                              | /* Load object into kernel */<br/>int bpf_object__load(struct bpf_object *obj); |
+|         |                                                              | /* unload object from kernel */<br/>int bpf_object__unload(struct bpf_object *obj); |
+|         |                                                              | bpf_link * bpf_program__attach(struct bpf_program *prog);    |
+|         |                                                              | int bpf_link__destroy(struct bpf_link *link);                |
+|         |                                                              | void bpf_object__close(struct bpf_object *object);           |
+|         |                                                              |                                                              |
+|         |                                                              | bpf_object__for_each_program(bpf_program *prog, bpf_object *obj) |
+|         |                                                              |                                                              |
+|         |                                                              |                                                              |
+|         |                                                              |                                                              |
+|         |                                                              |                                                              |
+|         |                                                              |                                                              |
+|         |                                                              | libbpf_get_error                                             |
+|         |                                                              |                                                              |
+|         |                                                              |                                                              |
+|         | &map, 是**struct** bpf_map_def SEC("maps")  `map` = {}       | 上面都是libbpf的api，基本上最后都会进入bpf系统调用           |
 
 
 
@@ -189,7 +206,7 @@ while (1)
 
 ------
 
-BCC中的map定义
+## BCC中的map定义
 
 ```c
 // 定义HASH_MAP，使用 BCC 宏定义，key 为 u64 类型，value 为 struct val_t 结构；
@@ -198,7 +215,88 @@ BPF_HASH(infotmp, u64, struct val_t);
 
 ![](sock_example_bcc版本实现.jpg)
 
+typora-notes/bpf_read/BCC/bcc-宏.md
+
+### BPF_HASH
+
+```c
+// 定义HASH_MAP，使用 BCC 宏定义，就是map，key 为 u64 类型，value 为 struct val_t 结构；
+BPF_HASH(infotmp, u64, struct val_t);
+
+infotmp.update(&id, &val);  // 保存中间结果至 hash_map 中,以 id 为 key，将 val 对象结果保存至 infotmp 中；
+
+// 用于读取在map中保存的信息，如果未查询到则直接返回，
+// 需要注意的是 lookup 函数的入参和出参都是指针类型，使用前需要判断；
+valp = infotmp.lookup(&id); // infotmp[id]， 从 hash_map 中获取到  sys_open 函数保存的中间数据
+if (valp == 0) {//没有找到
+    // missed entry
+    return 0;
+}
+
+infotmp.delete(&id);  // 删除这个k-v pair
+```
+
+
+
+c代码对应的定义方式
+
+k含义
+
+v含义
 
 
 
 
+
+### BPF_ARRAY
+
+```c
+// 定义ARRAY_MAP，使用 BCC 宏定义，不能用map观点，就是个数组，每个元素是u64类型，数组大小256
+BPF_ARRAY(count_map, u64, 256);
+
+int count_packets(struct __sk_buff *skb)
+{
+    int index = load_byte(skb, ETH_HLEN + offsetof(struct iphdr, protocol));
+    
+    //这个是类似于arr[index]，但是返回的不是对应的数据，而是&arr[index]
+    u64 *val = count_map.lookup(&index);
+    if(val)//如果index超出数组大小，那么返回空指针
+        count_map.increment(index);
+    return 0;
+}
+```
+
+U中使用：
+
+```python
+# bpf["count_map"]获取到这个array
+# bpf["count_map"][socket.IPPROTO_TCP]类似于arr[index]，U空间不再是&arr[index]，而是真正这个元素的值
+# .value表示ctypes.c_ulong 类型转化为int
+TCP_cnt = bpf["count_map"][socket.IPPROTO_TCP].value
+```
+
+
+
+如果是array类型的映射，那么可以使用==__sync_fetch_and_add==对数组的元素值进行原子计算
+
+```c
+//samples/bpf/sockex1_kern.c
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, u32);
+	__type(value, long);
+	__uint(max_entries, 256);
+} my_map SEC(".maps");
+
+value = bpf_map_lookup_elem(&my_map, &index);
+	if (value)
+		__sync_fetch_and_add(value, skb->len);//对应的数组元素值增加skb->len
+```
+
+
+
+c代码对应的定义方式
+
+k含义
+
+v含义

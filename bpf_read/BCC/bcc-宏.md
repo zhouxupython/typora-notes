@@ -117,6 +117,14 @@ value = bpf_map_lookup_elem(&my_map, &index);
 
 ### PT_REGS_RC
 
+不是bcc宏，是 tools/lib/bpf/bpf_tracing.h
+
+```c
+#define PT_REGS_RC(x) ((x)->rax)
+```
+
+
+
 ```python
 b.attach_kretprobe(event=b.get_syscall_fnname("open"), fn_name="trace_syscall_open_return")
 ```
@@ -125,7 +133,7 @@ b.attach_kretprobe(event=b.get_syscall_fnname("open"), fn_name="trace_syscall_op
 // 使用宏 PT_REGS_RC 从 ctx 字段中读取本次函数跟踪的返回值；
 int trace_syscall_open_return(struct pt_regs *ctx)
 {
-    evt.ret = PT_REGS_RC(ctx); // 读取结果值
+    evt.ret = PT_REGS_RC(ctx); // 读取结果值，即open函数调用的返回值，fd
     
     ......
     return 0;
@@ -205,4 +213,52 @@ KRETFUNC_PROBE(__x64_sys_openat, struct pt_regs *regs, int ret)
     return 0;
 }
 ```
+
+
+
+### BPF_KRETPROBE_READ_RET_IP
+
+```c
+#define PT_REGS_FP(x) ((x)->rbp)
+
+#define BPF_KRETPROBE_READ_RET_IP(ip, ctx)				    \
+	({ bpf_probe_read_kernel(&(ip), sizeof(ip),			    \
+			  (void *)(PT_REGS_FP(ctx) + sizeof(ip))); })
+			  
+
+long ip = 0;
+			  
+BPF_KRETPROBE_READ_RET_IP(ip, ctx);		
+
+---> bpf_probe_read_kernel(&(ip), sizeof(ip),  (void *)(PT_REGS_FP(ctx) + sizeof(ip))); 
+---> bpf_probe_read_kernel(&(ip), sizeof(ip),  (void *)((x)->rbp + sizeof(ip))); 
+---> bpf_probe_read_kernel(&(ip), sizeof(ip),  (void *)(ctx->rbp + sizeof(ip))); 
+
+//samples/bpf/tracex4_kern.c
+SEC("kretprobe/kmem_cache_alloc_node")
+int bpf_prog2(struct pt_regs *ctx)
+{
+	long ptr = PT_REGS_RC(ctx);
+	long ip = 0;
+
+	/* get ip address of kmem_cache_alloc_node() caller */
+	BPF_KRETPROBE_READ_RET_IP(ip, ctx);
+
+	struct pair v = {
+		.val = bpf_ktime_get_ns(),
+		.ip = ip,
+	};
+
+	bpf_map_update_elem(&my_map, &ptr, &v, BPF_ANY);
+	return 0;
+}
+```
+
+ctx->rbp + 4/8
+
+==其实就是当前ctx对应的函数的调用者==
+
+[c函数调用过程原理及函数栈帧分析](https://blog.csdn.net/zsy2020314/article/details/9429707)
+
+![image-20211215161119033](image-20211215161119033.png)
 

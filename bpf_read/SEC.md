@@ -111,3 +111,12 @@ obj = bpf_object__open_file("xxx_kern.o", NULL);
 bpf_object__load(obj)
 
 map_fd = bpf_object__find_map_fd_by_name(obj, "my_map");
+
+
+
+------
+
+
+
+
+

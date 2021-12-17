@@ -256,7 +256,7 @@ int bpf_prog2(struct pt_regs *ctx)
 
 ctx->rbp + 4/8
 
-==其实就是当前ctx对应的函数的调用者==
+==其实就是当前ctx对应的函数的调用者，即kmem_cache_alloc_node的调用者==
 
 [c函数调用过程原理及函数栈帧分析](https://blog.csdn.net/zsy2020314/article/details/9429707)
 

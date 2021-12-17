@@ -226,3 +226,140 @@ struct {
 } my_map SEC(".maps");
 ```
 
+------
+
+```c
+//samples/bpf/tracex4_kern.c
+struct pair {
+	u64 val;
+	u64 ip;
+};
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, long);
+	__type(value, struct pair);
+	__uint(max_entries, 1000000);
+} my_map SEC(".maps");
+
+展开：
+struct {
+	int (*type)[BPF_MAP_TYPE_HASH]
+	typeof(long) *key
+	typeof(struct pair) *value		/*指针啊*/
+	int (*max_entries)[1000000]
+} my_map SEC(".maps");
+```
+
+
+
+sudo strace -v -f -s 128 -o tracex4.txt ./tracex4：
+
+bpf(BPF_MAP_CREATE, {map_type=BPF_MAP_TYPE_HASH, key_size=8, value_size=`16`, 
+
+
+
+sudo bpftool map show 看到的也是
+	key 8B	value `16B`  max_entries 1000000	memlock 88788992B
+
+<font>[Q]</font>为何这里的value是16B，不是指针吗？应该是8B才对阿？
+
+
+
+换个map的定义看看，bcc定义方式：
+
+```c
+// include/linux/sched.h
+/* Task command name length: */
+#define TASK_COMM_LEN			16
+
+struct val_t {
+    u64 id;
+    char comm[TASK_COMM_LEN];
+    const char *fname;
+};
+
+BPF_HASH(infotmp, u64, struct val_t);
+```
+
+
+
+sudo strace -v -f -s 128 -o my_open_snoop_4.txt  /usr/bin/python    ./my_open_snoop_4.py
+
+bpf(BPF_MAP_CREATE, {map_type=BPF_MAP_TYPE_HASH, key_size=8, value_size=`32`, .......
+
+sizeof(struct val_t ) = 8 + 16 + 8 = 32
+
+是结构体的大小
+
+
+
+c定义方式
+
+```c
+#define __uint(name, val) int (*name)[val]
+#define __type(name, val) typeof(val) *name
+#define __array(name, val) typeof(val) *name[]
+
+struct pair {
+	u64 val;
+	u64 ip;
+};
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, long);
+	__type(value, struct pair);
+	__uint(max_entries, 1000000);
+} my_map SEC(".maps");
+
+展开：
+struct {
+	int (*type)[BPF_MAP_TYPE_HASH]
+	typeof(long) *key
+	typeof(struct pair) *value		虽然是指针
+	int (*max_entries)[1000000]
+} my_map SEC(".maps");
+```
+
+虽然使用SEC定义的时候，是使用的指针，但是map创建的时候，是字段的大小，
+
+sizeof（struct pair）= 16
+
+------
+
+
+
+
+
+1. **尾调用**（tail call）：高效地调用其他 BPF 程序
+2. **安全加固原语**（security hardening primitives）
+3. 用于 pin/unpin 对象（例如 map、程序）的**伪文件系统**（`bpffs`），实现持久存储
+4. 支持 BPF **offload**（例如 offload 到网卡）的基础设施
+
+BPF_OBJ_GET 如何指定想要获取的obj，因为肯定不止一个obj被pin到**BPF 文件系统**
+
+
+
+区别是什么？
+
+- **如果指定的是 `PIN_GLOBAL_NS`，那 map 会被放到 `/sys/fs/bpf/tc/globals/`**。 `globals` 是一个跨对象文件的全局命名空间。
+- 如果指定的是 `PIN_OBJECT_NS`，tc 将会为对象文件创建一个它的本地目录（local to the object file）。例如，只要指定了 `PIN_OBJECT_NS`，不同的 C 文件都可以像上 面一样定义各自的 `acc_map`。在这种情况下，这个 map 会在不同 BPF 程序之间共享。
+- `PIN_NONE` 表示 map 不会作为节点（node）钉（pin）到 BPF 文件系统，因此当 tc 退 出时这个 map 就无法从用户空间访问了。同时，这还意味着独立的 tc 命令会创建出独 立的 map 实例，因此后执行的 tc 命令无法用这个 map 名字找到之前被钉住的 map。 在路径 `/sys/fs/bpf/tc/globals/acc_map` 中，map 名是 `acc_map`。
+
+
+
+```shell
+$ mount | grep bpf
+sysfs on /sys/fs/bpf type sysfs (rw,nosuid,nodev,noexec,relatime,seclabel)
+bpf on /sys/fs/bpf type bpf (rw,relatime,mode=0700)
+
+$ tree /sys/fs/bpf/
+/sys/fs/bpf/
++-- ip -> /sys/fs/bpf/tc/
++-- tc
+|   +-- globals
+|       +-- acc_map
++-- xdp -> /sys/fs/bpf/tc/
+```
+

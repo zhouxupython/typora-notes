@@ -24,6 +24,14 @@ zx@u18-1:/etc/docker$ sudo cat daemon.json
 
 sudo systemctl daemon-reload
 sudo systemctl restart docker
+
+或者：
+zx@zx-docker:~$ sudo cat /etc/docker/daemon.json
+[sudo] password for zx:
+{
+  "registry-mirrors": ["https://7ixh250y.mirror.aliyuncs.com"]
+}
+
 ```
 
 

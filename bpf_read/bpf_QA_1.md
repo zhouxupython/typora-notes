@@ -363,3 +363,12 @@ $ tree /sys/fs/bpf/
 +-- xdp -> /sys/fs/bpf/tc/
 ```
 
+
+
+
+
+------
+
+xdp返回值：XDP_REDIRECT 如何指定一个重定向的cpu？
+
+bpf cpumap ？ 这是什么意思？来个例子

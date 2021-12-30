@@ -1,9 +1,10 @@
 # docker_cgroup
 
+------
+
+
+
 ```shell
-
-```
-
 zx@zx-docker:~$ docker ps -a
 CONTAINER ID   IMAGE        COMMAND       CREATED        STATUS                      PORTS     NAMES
 `b518627b0da2`   ubuntu-net   "/bin/bash"   46 hours ago   Exited (0) 22 hours ago               c3
@@ -11,18 +12,10 @@ zx@zx-docker:~$ docker start b518627b0da2
 b518627b0da2
 zx@zx-docker:~$ docker inspect b518627b0da2 | grep -i pid
             "Pid": `2744`,
-zx@zx-docker:~$ cd /sys/fs/cgroup/
-zx@zx-docker:/sys/fs/cgroup$ cd cpu
-zx@zx-docker:/sys/fs/cgroup/cpu$ cd docker/
+zx@zx-docker:~$ cd /sys/fs/cgroup/cpu/docker
 zx@zx-docker:/sys/fs/cgroup/cpu/docker$ ls
-`b518627b0da25ab...`  cpuacct.usage_percpu_sys   cpu.stat
-cgroup.clone_children                                             cpuacct.usage_percpu_user  cpu.uclamp.max
-cgroup.procs                                                      cpuacct.usage_sys          cpu.uclamp.min
-cpuacct.stat                                                      cpuacct.usage_user         notify_on_release
-cpuacct.usage                                                     cpu.cfs_period_us          tasks
-cpuacct.usage_all                                                 cpu.cfs_quota_us
-cpuacct.usage_percpu                                              cpu.shares
-zx@zx-docker:/sys/fs/cgroup/cpu/docker$
+`b518627b0da25ab...` 
+......
 zx@zx-docker:/sys/fs/cgroup/cpu/docker$ cd b518627b0da25ab.../
 zx@zx-docker:/sys/fs/cgroup/cpu/docker/b518627b0da25ab...$ ls
 cgroup.clone_children  cpuacct.usage_all          cpuacct.usage_sys   cpu.shares      notify_on_release
@@ -35,7 +28,7 @@ zx@zx-docker:/sys/fs/cgroup/cpu/docker/b518627b0da25ab...$ cat cpu.cfs_period_us
 zx@zx-docker:/sys/fs/cgroup/cpu/docker/b518627b0da25ab...$ cat cpu.cfs_quota_us
 -1
 zx@zx-docker:/sys/fs/cgroup/cpu/docker/b518627b0da25ab...$ cat tasks
-2744
+`2744`
 zx@zx-docker:/sys/fs/cgroup/cpu/docker/b518627b0da25ab...$ cat `/proc/2744/cgroup`
 12:pids:/docker/b518627b0da25ab...
 11:freezer:/docker/b518627b0da25ab...
@@ -51,10 +44,7 @@ zx@zx-docker:/sys/fs/cgroup/cpu/docker/b518627b0da25ab...$ cat `/proc/2744/cgrou
 1:name=systemd:/docker/b518627b0da25ab...
 0::/system.slice/containerd.service
 
-
-
-***好像只有这个路径下执行才有效***		
-
+#好像只有这个路径下执行才有效
 zx@zx-docker:/sys/fs/cgroup/cpu$ `cgget -a docker/b518627b0da25ab...`
 docker/b518627b0da25ab... :
 blkio.throttle.read_iops_device:
@@ -78,6 +68,20 @@ pids.current: 1
 pids.events: max 0
 pids.max: max
 
-zx@zx-docker:/sys/fs/cgroup/cpu$ cgget -r cpu.cfs_quota_us   docker/b518627b0da25ab...
+zx@zx-docker:/sys/fs/cgroup/cpu$ `cgget -r cpu.cfs_quota_us   docker/b518627b0da25ab...`
 docker/b518627b0da25ab... :
 cpu.cfs_quota_us: -1
+```
+
+
+
+![image-20211230112400522](image-20211230112400522.png)
+
+容器在宿主机的进程号，会写入该docker的cgroup：tasks文件中；
+
+在容器中执行top，这个docker的cgroup：tasks 会出现另一个进程，就是宿主机中看到的这个top进程。
+
+容器取消top的执行，docker的cgroup：tasks 中这个进程号消失。
+
+容器内部的所有进程，包括容器自身的进程，==宿主机都能够感知到，也都会在对应的cgroup中监控==。
+

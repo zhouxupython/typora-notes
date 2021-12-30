@@ -4,6 +4,10 @@
 
 
 
+https://blog.csdn.net/flag2920/category_10852090.html	对docker的cpu mem进行限制
+
+
+
 ```shell
 zx@zx-docker:~$ docker ps -a
 CONTAINER ID   IMAGE        COMMAND       CREATED        STATUS                      PORTS     NAMES
@@ -198,3 +202,145 @@ directory in the cgroup filesystem:
 
       mkdir /sys/fs/cgroup/cpu/cg1
 ```
+
+
+
+
+
+
+
+### net
+
+```shell
+#逐层深入，net_prio.ifpriomap一直不变，显示的是宿主机的if；net_prio.prioidx在变化
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+2: enp0s3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+3: docker0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default
+5: veth9dfcb22@if4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default
+
+zx@zx:/sys/fs/cgroup/net_cls,net_prio$ cat net_cls.classid
+0
+zx@zx:/sys/fs/cgroup/net_cls,net_prio$ cat net_prio.prioidx
+1
+zx@zx:/sys/fs/cgroup/net_cls,net_prio$ cat net_prio.ifpriomap
+lo 0
+enp0s3 0
+docker0 0
+veth9dfcb22 0
+
+zx@zx:/sys/fs/cgroup/net_cls,net_prio$ cd docker/
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker$ cat cgroup.procs
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker$ cat net_cls.classid
+0
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker$ cat net_prio.ifpriomap
+lo 0
+enp0s3 0
+docker0 0
+veth9dfcb22 0
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker$ cat net_prio.prioidx
+2
+
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker$ cd 8bf42f21ddf537c69627fe6da34f3bea3ffc46e10120841c07a2529a6a1e7e83/
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker/8bf42f21ddf537c69627fe6da34f3bea3ffc46e10120841c07a2529a6a1e7e83$ cat cgroup.procs
+5784
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker/8bf42f21ddf537c69627fe6da34f3bea3ffc46e10120841c07a2529a6a1e7e83$ cat net_cls.classid
+0
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker/8bf42f21ddf537c69627fe6da34f3bea3ffc46e10120841c07a2529a6a1e7e83$ cat net_prio.ifpriomap
+lo 0
+enp0s3 0
+docker0 0
+veth9dfcb22 0
+zx@zx:/sys/fs/cgroup/net_cls,net_prio/docker/8bf42f21ddf537c69627fe6da34f3bea3ffc46e10120841c07a2529a6a1e7e83$ cat net_prio.prioidx
+3
+```
+
+
+
+## cgroup 子系统 net_cls (Network classifier cgroup)
+
+[cgroup 子系统之 net_cls 和 net_prio](https://ggaaooppeenngg.github.io/zh-CN/2017/05/19/cgroup-%E5%AD%90%E7%B3%BB%E7%BB%9F%E4%B9%8B-net-cls-%E5%92%8C-net-prio/)
+
+net_cls 可以给 packet 打上 classid 的标签，用于过滤分类，有了上面的详细解释，这个 classid 的作用也非常明显了，就是用于标记`skb`所属的 qdisc class 的。
+
+有了这个标签，流量控制器（tc）可以对不同的 cgroup 的 packet 起作用，Netfilter（iptables）也可以基于这个标签有对应的动作。创建一个 net_cls cgroup 对应的是创建一个 net_cls.classid 文件，这个文件初始化为 0。
+
+可以写 16 进制的 0xAAAABBBB 到这个文件里面，**AAAA** 是 major 号，**BBBB** 是 minor 号。读这个文件返回的是十进制的数字。
+
+这个值，既是cgroup：net_cls.classid，又是tc：handle
+
+例子
+
+```shell
+#0x100001  0x00100001    0010：0001     10:1
+mkdir /sys/fs/cgroup/net_cls
+mount -t cgroup -onet_cls net_cls /sys/fs/cgroup/net_cls
+mkdir /sys/fs/cgroup/net_cls/0
+echo 0x100001 >  /sys/fs/cgroup/net_cls/0/net_cls.classid
+```
+
+设置一个 10:1 handle.  也就是classid=0x100001
+
+```shell
+cat /sys/fs/cgroup/net_cls/0/net_cls.classid
+1048577
+```
+
+配置 tc:
+
+```shell
+tc qdisc add dev eth0 root handle 10: htb
+tc class add dev eth0 parent 10: classid 10:1 htb rate 40mbit
+```
+
+创建 traffic class 10:1
+
+```shell
+tc filter add dev eth0 parent 10: protocol ip prio 10 handle 1: cgroup
+```
+
+配置 iptables，也可以用于这个 classid。
+
+```shell
+iptables -A OUTPUT -m cgroup ! --cgroup 0x100001 -j DROP
+```
+
+对应的实现在`net/core/netclassid_cgroup.c`下面。起作用的方式是`css_cls_state`的`classid`并且`sock_cgroup_set_classid(&sock->sk->sk_cgrp_data,(unsigned long)v)`来设置`sock`的`classid`。
+
+
+
+
+
+`net_cls` 子系统使用等级识别符（classid）标记网络数据包，可允许 Linux 流量控制程序（**tc**）识别从具体 cgroup 中生成的数据包。可将流量控制程序配置为给不同 cgroup 中的数据包分配不同的优先权。
+
+- net_cls.classid
+
+    `net_cls.classid` 包含一个说明流量控制*句柄*的十六进制的值。例如：`0x1001` 代表通常写成 `10:1` 的句柄，这是 iproute2 使用的格式。这些句柄的格式为：`0x*AAAA**BBBB*`，其中 *AAAA* 是十六进制主设备号，*BBBB* 是十六进制副设备号。您可以忽略前面的零；`0x10001` 与 `0x00010001` 一样，代表 `1:1`。
+
+
+
+net_cls实现的基本的思想就是将控制组和内核现有的网络包分类和调度的机制相关联。net_cls通过给控制组分配一个类标识符（classid）来指定该控制组的数据包将被分到哪个traffic class（net_cls只支持可分类的qdsic队列规则）。数据包在发送的时候会根据添加到设备qdisc上的cgroup filter将数据包分到与其classid相符的traffic class队列中，再由设备上设置的具体qdsic来控制数据包的发送，以达到控制网络资源使用的目的。
+
+创建一个挂有net_cls的cgroup后，在其下会生有个名为net_cls.classid（默认初始值为0）的文件，通过这个文件指定该组进程相关的数据包进入哪个traffic class。通过向文件写入形如0xAAAABBBB的十六进制值（AAAA为主处理号，BBBB为次处理号，读取该值是以十进制显示），设置cgroup的classid后，再进行相应的tc配置，添加符合classid的traffic class，并使用cgroup filter。这样当cgroup中的进程需要使用网络接口发送数据包的时候，则会按照接口上classid相应的tc策略控制进程对网络资源的使用。
+
+需要进行tc控制的进程，将自己的pid写入对应的cgroup.procs/tasks即可。
+
+task、cgroup、tc规则 三者关联起来
+
+task								cgroup								   	       tc
+
+|---------------------->  net_cls.cgroup.procs/tasks
+
+Pid							net_cls.classid		<----------------->  classid --------> tc-config
+
+​                                                                                                          |
+
+​                                                                                                          |--------> traffic class & cgroup filter
+
+https://www.cnblogs.com/xingmuxin/p/10813386.html
+
+https://blog.csdn.net/tanzhe2017/article/details/81001621
+
+https://www.cnblogs.com/sammyliu/p/5886833.html
+
+https://blog.csdn.net/hu1610552336/article/details/118642410

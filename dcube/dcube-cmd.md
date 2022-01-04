@@ -135,6 +135,92 @@
 
 
 
+```shell
+zx@zx-dcube1:~/works/dcube-tmp/tests$ cubectl cube create firewall --help
+Create a firewall cube
+
+Usage:
+  cubectl cube create firewall CUBE_NAME [flags]
+
+Aliases:
+  firewall, fw
+
+Flags:
+  -c, --conntrack string           conntrack mode < disable | auto > (default "auto")
+  -h, --help                       help for firewall
+      --log-level string           trace log level < debug | info | warning | error | none >  (default "error")
+      --max-conntrack-num uint32   firewall max conntrack num (limit: 655360) (default 65536)
+      --max-rule-num uint32        firewall max rule num  (range: 64~16000) (default 4196)
+      --statistic-enable           statistic enable if set this flag
+  -w, --workmode string            work mode type < normal | whitelist | blacklist > (default "normal")
+```
+
+
+
+
+
+```shell
+zx@zx-dcube1:~$ cubectl cube create firewall fw1 --workmode=normal
+
+zx@zx-dcube1:~$ cubectl cube  show  list fw
+
+firewall         cube list <num=1> 
+------------------------------------------------------------
+id: 0            name: fw1     
+
+zx@zx-dcube1:~/works/dcube-tmp/tests$ cubectl cube  show  info fw1
+
+------------------------------------------------------------
+              transparent cube <fw1> basic info
+------------------------------------------------------------
+cube-type     : firewall  statistic     : false   
+prog-type     : tc        hook-type     : tc-both 
+log-level     : error     attach-status : none    
+------------------------------------------------------------
+                hook <ingress> basic info
+------------------------------------------------------------
+link-type     : none      
+prev-map      : 0     prev-prog     : 0   
+next-map      : 0     next-prog     : 0   
+------------------------------------------------------------
+                hook <egress> basic info
+------------------------------------------------------------
+link-type     : none      
+prev-map      : 0     prev-prog     : 0   
+next-map      : 0     next-prog     : 1   
+------------------------------------------------------------
+                firewall private info
+------------------------------------------------------------
+work-mode    : normal     conntrack          : auto    
+max-rule-num : 4196   max-conntrack-num  : 65536
+hook <ingress > : 
+    default-action: accept  rule-num: 0      loop-num: 0   
+hook <egress  > : 
+    default-action: accept  rule-num: 0      loop-num: 0   
+```
+
+
+
+未指定时：
+
+work-mode    		: 		normal     
+
+conntrack         	 : 		auto    
+
+default-action		:	 	accept
+
+
+
+work-mode、direction、default-action、conntrack、{5}+flag、action
+
+
+
+匹配顺序：
+
+conntrack enable		cubectl cube create
+config rules					cubectl firewall rule append/insert
+default action				cubectl firewall set action
+
 ## slimfirewall
 
 ​    **slimfirewall**   SlimFirewall Cube Subcommands
@@ -174,3 +260,69 @@
 ​                    **rule**        Display all rules of a slimfirewall cube
 ​                            -c, --cube string        cube name
 ​                                 --direction string   rule direction < ingress | egress >
+
+
+
+```shell
+zx@zx-dcube1:~$ cubectl cube create slimfirewall --help
+Create a slimfirewall cube
+
+Usage:
+  cubectl cube create slimfirewall CUBE_NAME [flags]
+
+Aliases:
+  slimfirewall, slimfw
+
+Flags:
+  -c, --conntrack string           conntrack mode < disable | auto > (default "auto")
+  -h, --help                       help for slimfirewall
+      --log-level string           trace log level < debug | info | warning | error | none >  (default "error")
+      --max-conntrack-num uint32   slimfirewall max conntrack num (limit: 655360) (default 65536)
+      --max-rule-num uint32        slimfirewall max rule num (limit: 20648) (default 8192)
+      --statistic-enable           statistic enable if set this flag
+  -w, --workmode string            work mode type < whitelist | blacklist > (default "whitelist")
+
+```
+
+```shell
+zx@zx-dcube1:~$ cubectl cube create slimfirewall sfw1
+
+zx@zx-dcube1:~$ cubectl cube show list slimfirewall
+
+slimfirewall     cube list <num=1> 
+------------------------------------------------------------
+id: 0            name: sfw1    
+
+
+zx@zx-dcube1:$ cubectl cube  show  info sfw1
+
+------------------------------------------------------------
+              transparent cube <sfw1> basic info
+------------------------------------------------------------
+cube-type     : slimfirewall  statistic     : false   
+prog-type     : tc        hook-type     : tc-both 
+log-level     : error     attach-status : none    
+------------------------------------------------------------
+                hook <ingress> basic info
+------------------------------------------------------------
+link-type     : none      
+prev-map      : 0     prev-prog     : 0   
+next-map      : 0     next-prog     : 0   
+------------------------------------------------------------
+                hook <egress> basic info
+------------------------------------------------------------
+link-type     : none      
+prev-map      : 0     prev-prog     : 0   
+next-map      : 0     next-prog     : 1   
+------------------------------------------------------------
+               slimfirewall private info
+------------------------------------------------------------
+work-mode    : whitelist   conntrack          : auto        k8s: false
+max-rule-num : 8192   max-conntrack-num  : 65536
+hook <ingress >  : 
+    global-action  : normal  rule-num  : 0   
+hook <egress  > : 
+    global-action  : normal  rule-num  : 0   
+
+```
+

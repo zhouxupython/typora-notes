@@ -52,6 +52,106 @@
 
 
 
+```shell
+zx@zx-dcube1:~$ cubectl cube create ddos-mitigator --help
+Create a ddos-mitigator cube
+
+Usage:
+  cubectl cube create ddos-mitigator CUBE_NAME [flags]
+
+Aliases:
+  ddos-mitigator, dm
+
+Flags:
+  -h, --help                  help for ddos-mitigator
+      --log-level string      trace log level < debug | info | warning | error | none >  (default "error")
+      --max-rule-num uint32   max rule num per rule type (limit: 20648) (default 8192)
+      --statistic-enable      statistic enable if set this flag
+  -t, --type string           ebpf program type < xdp | tc > (default "xdp")
+
+```
+
+
+
+```shell
+zx@zx-dcube1:~$ cubectl cube  show  info d0
+
+------------------------------------------------------------
+              transparent cube <d0> basic info
+------------------------------------------------------------
+cube-type     : ddos-mitigator  statistic     : false   
+prog-type     : xdp       hook-type     : xdp-in  
+log-level     : error     attach-status : none    
+xdp-driver    : auto    
+------------------------------------------------------------
+                hook <ingress> basic info
+------------------------------------------------------------
+link-type     : none      
+prev-map      : 0     prev-prog     : 0   
+next-map      : 0     next-prog     : 0   
+------------------------------------------------------------
+ddos-mitigator private info
+------------------------------------------------------------
+hook <ingress > : 
+    workmode       : normal  
+    l3-rule-max    : 8192  l3-rule-num : 0   
+    l4-rule-max    : 8192  l4-rule-num : 0   
+    ratelimt-mode  : disable 
+    ratelimt-value : icmp : 0  udp : 0  tcp : 0
+
+```
+
+```shell
+zx@zx-dcube1:~$ cubectl cube create ddos-mitigator d1 --type tc 
+ 
+zx@zx-dcube1:~$ cubectl cube  show  info d1
+
+------------------------------------------------------------
+              transparent cube <d1> basic info
+------------------------------------------------------------
+cube-type     : ddos-mitigator  statistic     : false   
+prog-type     : tc        hook-type     : tc-in   
+log-level     : error     attach-status : none    
+------------------------------------------------------------
+                hook <ingress> basic info
+------------------------------------------------------------
+link-type     : none      
+prev-map      : 0     prev-prog     : 0   
+next-map      : 0     next-prog     : 0   
+------------------------------------------------------------
+ddos-mitigator private info
+------------------------------------------------------------
+hook <ingress > : 
+    workmode       : normal  
+    l3-rule-max    : 8192  l3-rule-num : 0   
+    l4-rule-max    : 8192  l4-rule-num : 0   
+    ratelimt-mode  : disable 
+    ratelimt-value : icmp : 0  udp : 0  tcp : 0
+```
+
+```shell
+zx@zx-dcube1:~$ cubectl cube attach --help
+Attach a transparent cube to a physical port
+
+Usage:
+  cubectl cube attach CUBE_NAME IFNAME [flags]
+
+Examples:
+	# attach cube0 to eth0
+	$ cubectl cube attach cube0 eth0
+	# attach cube1 to eth0 and its location is after cube0 which is attached
+	$ cubectl cube attach cube0 eth0 --location=after:cube0
+	
+
+Flags:
+  -h, --help                help for attach
+  -l, --location string     attach location <before:cube-name | after:cube-name | fix:first | fix:last>
+      --xdp-driver string   xdp driver <auto | generic | native> (only valid for xdp type cube and port is not attached or connected with other xdp cube)
+
+```
+
+
+
 ## firewall
 
 ​    **firewall**       Firewall Cube Subcommands
@@ -325,4 +425,6 @@ hook <egress  > :
     global-action  : normal  rule-num  : 0   
 
 ```
+
+
 

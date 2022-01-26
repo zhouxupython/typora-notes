@@ -6,10 +6,10 @@
 | ------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | 创建map | 1. struct {} `my_map` ***SEC***("maps") <br/>2. sys_bpf(BPF_MAP_CREATE, ...？？？？？ | 1. int `map_fd` = ***bpf***(BPF_MAP_CREATE, ...<br/>2. `map_fd` = ***bpf_create_map***(BPF_MAP_TYPE_x, sizeof(key), sizeof(value), 256, 0); |
 | map fd  | K可以直接使用 `my_map`<br/>或者**全局变量**==map_fd==[n].*fd* | struct bpf_object *obj;<br/>int map_fd, prog_fd;<br/>**bpf_prog_load**("xxx_kern.o", BPF_PROG_TYPE_xxx, &*obj, &prog_fd)<br/>`map_fd` = ***bpf_object__find_map_fd_by_name***(obj, "`my_map`"); |
-| 查找    | ***bpf_map_lookup_elem***(&map, key)<br/>//返回查找结果的指针，为空表示不存在 | ***bpf_map_lookup_elem***(map_fd, &k, &v);<br/>//返回值0表示查找成功 |
-| 插入    | ***bpf_map_update_elem***(&map, key, &val, BPF_NOEXIST)      | int ***bpf_map_update_elem***(int fd, const void *key, const void *value, __u64 flags); |
+| 查找    | ***bpf_map_lookup_elem***(&map, key)<br/>//返回查找结果的指针，为空表示不存在（kernel/bpf/helpers.c） | ***bpf_map_lookup_elem***(map_fd, &k, &v);<br/>//返回值0表示查找成功 |
+| 插入    | ***bpf_map_update_elem***(&map, key, &val, BPF_NOEXIST)<br/>(kernel/bpf/helpers.c) | int ***bpf_map_update_elem***(int fd, const void *key, const void *value, __u64 flags); |
 | 遍历    |                                                              | ***bpf_map_get_next_key***(map_fd, &k1, &k2)<br/>//返回为-1表示遍历结束 |
-| 删除    |                                                              |                                                              |
+| 删除    | bpf_map_delete_elem                                          |                                                              |
 |         |                                                              |                                                              |
 |         |                                                              |                                                              |
 |         |                                                              |                                                              |

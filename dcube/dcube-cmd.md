@@ -1,5 +1,190 @@
 # cubectl
 
+## cube
+
+**cube**		Cube Common Subcommands 
+
+​			**create**      Create a cube							
+
+​						**ddos-mitigator**		 Create a ddos-mitigator cube
+
+​									*CUBE_NAME*
+
+​                             --log-level string      trace log level < debug | info | warning | error | none >  (default "error")
+​                             --max-rule-num uint32   max rule num per rule type (limit: 20648) (default 8192)
+​                             --statistic-enable      statistic enable if set this flag
+
+​                             -t, --type string           ebpf program type < ==xdp== | tc > (default "xdp")
+
+
+
+​						**firewall**      				 Create a firewall cube
+
+​									*CUBE_NAME*
+
+​                             -c, --conntrack string           conntrack mode < disable | ==auto== > (default "auto")
+​                             --log-level string           trace log level < debug | info | warning | error | none >  (default "error")
+​                             --max-conntrack-num uint32   firewall max conntrack num (limit: 655360) (default 65536)
+​                             --max-rule-num uint32        firewall max rule num  (range: 64~16000) (default 4196)
+​                             --statistic-enable           statistic enable if set this flag
+​                             -w, --workmode string            work mode type < ==normal== | whitelist | blacklist > (default "normal")
+
+
+
+​						**forwarder**      			Create a forwarder cube
+
+​									*CUBE_NAME*
+
+​                             --log-level string   trace log level < debug | info | warning | error | none >  (default "error")
+
+​                             -t, --type string        ebpf program type < ==xdp== | tc > (default "xdp")
+
+
+
+​						**loadbalancer**   		 Create a loadbalancer cube
+
+​									*CUBE_NAME*
+
+
+
+​						**nat**            					Create a nat cube
+
+​									*CUBE_NAME*
+
+
+
+​						**packetcapture**  		Create a packetcapture cube
+
+​									*CUBE_NAME*
+
+
+
+​						**slimfirewall**   			Create a slimfirewall cube
+
+​                             *CUBE_NAME*
+
+​                             -c, --conntrack string           conntrack mode < disable | ==auto== > (default "auto")
+​                             -h, --help                       help for slimfirewall
+​                            --log-level string           trace log level < debug | info | warning | error | none >  (default "error")
+​                            --max-conntrack-num uint32   slimfirewall max conntrack num (limit: 655360) (default 65536)
+​                            --max-rule-num uint32        slimfirewall max rule num (limit: 20648) (default 8192)
+​                            --statistic-enable           statistic enable if set this flag
+​                             -w, --workmode string            work mode type < ==whitelist== | blacklist > (default "whitelist")
+
+
+
+​			**destroy**     Destroy a cube
+
+ 						--force   force delete flag
+
+
+
+​			**attach**      Attach a <font title="gray">transparent cube</font> to a <font title="blue">physical port</font>
+
+​						*CUBE_NAME*   *IFNAME*  [flags]
+
+​                             -l, --location string     attach location <before:cube-name | after:cube-name | fix:first | fix:last>
+​                             --xdp-driver string   xdp driver <==auto== | generic | native> (only valid for xdp type cube and                    port is not attached or connected with other xdp cube)
+
+​	                Examples:
+​	                	// attach cube0 to eth0
+​	                	$ cubectl cube attach cube0 eth0
+​	                	// attach cube1 to eth0 and its location is after cube0 which is attached
+​	                	$ cubectl cube attach cube0 eth0 --location=after:cube0	
+
+​			**detach**      Detach a transparent cube from the physical port
+
+​						*CUBE_NAME*
+
+
+
+​			**connect**     Connect the <font style="background-color:#8bc34a">standard cube</font>'s <font title="yellow">virtual port</font> to a <font title="blue">physical port</font> or another <font title="yellow">virtual port</font>
+
+​						  *CUBE_NAME:PORT_NAME*   *CUBE_NAME:PORT_NAME* | *IFNAME*   [flags]
+
+​								  	--xdp-driver string   xdp driver  <==auto== | generic | native> (only valid for xdp type cube and port is not attached or connected with other xdp cube)
+
+​	                Examples:
+
+​	                	// connect port2 of fwd0 to port3 of fwd1
+
+​	                	$ cubectl cube connect fwd0:port2   fwd1:port3
+
+​	                	// connect port1 of fwd0 to veth1
+
+​	                	$ cubectl cube connect fwd0:port1   VETH1
+
+
+
+​	   	**disconnect**  Disconnect a standard cube's virtual port or a physical port from its counterpart
+
+​			  			*CUBE_NAME:PORT_NAME*  |  *IFNAME*
+
+​							Examples:
+
+​                       $ cubectl cube disconnect fwd0:port2   
+
+
+
+​       	 **port**        Port Subcmds
+
+  				  **add**         Add a <font title="yellow">virtual port</font> to a <font style="background-color:#8bc34a">standard cube</font>
+
+​							*CUBE_NAME PORT_NAME*
+
+  		 		 **delete**      Delete a virtual port of a standard cube
+
+​							*CUBE_NAME PORT_NAME*   [flags]
+
+ 								     --force   force delete flag
+
+
+
+  			**statistics**  Cube Statistics Subcommands
+
+​				    **clear**       Clear statistics of a cube
+
+​							 *CUBE_NAME*
+
+​				    **show**        Show statistics of a cube
+
+​							 *CUBE_NAME*
+
+
+
+  			**clear**       Clear all cubes of a certain type
+
+​		 			*CUBE_TYPE*
+
+​						    	currently supported cube types : 
+
+​											ddos-mitigator (dm) | firewall (fw) | slimfirewall (slimfw) | nat | forwarder (fwd)
+
+​											loadbalancer (lb) | packetcapture(pcap) | ==all==
+
+
+
+  			**show**        Show Subcmds
+
+​		 			**info**        Display the details of a cube
+
+​							 *CUBE_NAME*		
+
+ 		 		  **list**        Display a list of all cubes of a certain type
+
+​							 *CUBE_TYPE*
+​										currently supported types : 
+
+​													ddos-mitigator | firewall | slimfirewall | nat | forwarder | packetcapture
+
+​										Examples:										
+
+​										// display all firewall cubes, get the wanted fw name, then use info to get details
+
+​										$ cubectl cube show list firewall
+
+​										$ cubectl cube show info fw0
+
 ## ddos-mitigator
 
 ​    **ddos-mitigator** DDoS-mitigator Cube Subcommands
@@ -425,6 +610,36 @@ hook <egress  > :
     global-action  : normal  rule-num  : 0   
 
 ```
+
+
+
+## forwarder
+
+**forwarder**  	Forwarder Cube Subcommands
+
+​		**rule**        Forwarder Cube Rule Subcommands
+
+​					**append**      Append a forwarder rule
+
+​						    -c, --cube string       		cube name
+​						    -i, --in-port string   		  forwarder input port
+​						    -o, --out-port string    	forwarder output port
+
+​					**delete**        Delete a forwarder rule
+
+​						    -c, --cube string       cube name
+​						    -i, --in-port string    forwarder input port
+​						    -o, --out-port string   forwarder output port
+
+​					**flush**          Flush a forwarder rule
+
+​						    -c, --cube string   cube name
+
+​		**show**        Forwarder Cube Show Subcommands
+
+​					**rule**        Display all rules of the forwarder cube
+
+  						   -c, --cube string   cube name
 
 
 

@@ -130,7 +130,7 @@
 
   				  **add**         Add a <font title="yellow">virtual port</font> to a <font style="background-color:#8bc34a">standard cube</font>
 
-​							*CUBE_NAME PORT_NAME*
+​							*CUBE_NAME    PORT_NAME*
 
   		 		 **delete**      Delete a virtual port of a standard cube
 
@@ -140,7 +140,7 @@
 
 
 
-  			**statistics**  Cube Statistics Subcommands
+  			**statistics**  Cube Statistics Subcommands, depends on whether use --statistic-enable on cube create 
 
 ​				    **clear**       Clear statistics of a cube
 
@@ -642,4 +642,25 @@ hook <egress  > :
   						   -c, --cube string   cube name
 
 
+
+```shell
+cubectl cube create forwarder fwd0
+cubectl cube create forwarder fwd1
+
+cubectl cube port add fwd0 port0
+cubectl cube port add fwd0 port1
+cubectl cube port add fwd1 port2
+cubectl cube port add fwd1 port3
+
+# connect是在不同的forward中的port，或者和端口进行
+cubectl cube connect fwd0:port1 VETH1
+cubectl cube connect fwd1:port3 VETH2
+cubectl cube connect fwd0:port2 fwd1:port4
+
+# rule却是同一个forward中的port指定in-out规则
+cubectl forwarder rule append -c fwd0 -i port1 -o port2
+cubectl forwarder rule append -c fwd0 -i port2 -o port1
+cubectl forwarder rule append -c fwd1 -i port3 -o port4
+cubectl forwarder rule append -c fwd1 -i port4 -o port3
+```
 

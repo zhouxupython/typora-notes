@@ -75,7 +75,7 @@
 
 ​			**destroy**     Destroy a cube
 
- 						--force   force delete flag
+​					--force   force delete flag
 
 
 
@@ -128,33 +128,33 @@
 
 ​       	 **port**        Port Subcmds
 
-  				  **add**         Add a <font title="yellow">virtual port</font> to a <font style="background-color:#8bc34a">standard cube</font>
+​       			      **add**         Add a <font title="yellow">virtual port</font> to a <font style="background-color:#8bc34a">standard cube</font>
 
-​							*CUBE_NAME    PORT_NAME*
+​		          					*CUBE_NAME    PORT_NAME*
 
-  		 		 **delete**      Delete a virtual port of a standard cube
+​           	 		 **delete**      Delete a virtual port of a standard cube
 
-​							*CUBE_NAME PORT_NAME*   [flags]
+​          							*CUBE_NAME PORT_NAME*   [flags]
 
- 								     --force   force delete flag
-
-
-
-  			**statistics**  Cube Statistics Subcommands, depends on whether use --statistic-enable on cube create 
-
-​				    **clear**       Clear statistics of a cube
-
-​							 *CUBE_NAME*
-
-​				    **show**        Show statistics of a cube
-
-​							 *CUBE_NAME*
+​					     		     --force   force delete flag
 
 
 
-  			**clear**       Clear all cubes of a certain type
+​    		**statistics**      Cube Statistics Subcommands, depends on whether use --statistic-enable on cube create 
 
-​		 			*CUBE_TYPE*
+​      				    **clear**       Clear statistics of a cube
+
+​          							 *CUBE_NAME*
+
+​      				    **show**       Show statistics of a cube
+
+​	          						 *CUBE_NAME*
+
+
+
+​     		**clear**       Clear all cubes of a certain type
+
+​      		 			*CUBE_TYPE*
 
 ​						    	currently supported cube types : 
 
@@ -164,15 +164,15 @@
 
 
 
-  			**show**        Show Subcmds
+​      		**show**        Show Subcmds
 
-​		 			**info**        Display the details of a cube
+​       		 			**info**        Display the details of a cube
 
-​							 *CUBE_NAME*		
+​           							 *CUBE_NAME*		
 
- 		 		  **list**        Display a list of all cubes of a certain type
+​	 		  **list**        Display a list of all cubes of a certain type
 
-​							 *CUBE_TYPE*
+​			   			 *CUBE_TYPE*
 ​										currently supported types : 
 
 ​													ddos-mitigator | firewall | slimfirewall | nat | forwarder | packetcapture

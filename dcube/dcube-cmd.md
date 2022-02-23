@@ -409,7 +409,7 @@ Flags:
 
 ​            **set**         Firewall Cube Set Subcommands
 ​                    **action**      Set firewall ==default== action (==only== for normal work mode)
-​                            -a, --action string      default action < accept | deny > (only for normal work mode)
+​                            -a, --action string      default action < ==accept== | deny > (only for normal work mode)
 ​                            -c, --cube string        cube name
 ​                                  --direction string   rule direction < ingress | egress >
 
@@ -488,11 +488,11 @@ hook <egress  > :
 
 未指定时：
 
-work-mode    		: 		normal     
+work-mode    		: 		==normal==   
 
-conntrack         	 : 		auto    
+conntrack         	 : 		==auto==      
 
-default-action		:	 	accept
+default-action		:	 	==accept== 
 
 
 

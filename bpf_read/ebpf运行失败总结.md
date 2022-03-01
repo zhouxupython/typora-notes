@@ -33,7 +33,21 @@ What is probably happening here is that your kernel does support the BPF helper,
 
 
 
+### 1
 
+https://stackoverflow.com/questions/62159622/what-is-wrong-with-the-bpf-csum-diff-function-call
+
+​            
+
+You are loading your program as a `socket_filter`, which does not have *direct packet access*. Please refer to [this question](https://stackoverflow.com/questions/61702223/bpf-verifier-rejects-code-invalid-bpf-context-access) and its answer.           
+
+I'm not sure I understood  your question. Why not attach your program as a TC filter instead of a  socket filter? It would probably be more flexible and possibly better  suited to what you are trying to achieve?
+
+
+
+
+
+https://stackoverflow.com/questions/61702223/bpf-verifier-rejects-code-invalid-bpf-context-access
 
 
 

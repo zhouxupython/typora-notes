@@ -639,7 +639,7 @@ hook <egress  > :
 
 ​					**rule**        Display all rules of the forwarder cube
 
-  						   -c, --cube string   cube name
+​					        -c, --cube string   cube name
 
 
 

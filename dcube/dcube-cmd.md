@@ -664,3 +664,141 @@ cubectl forwarder rule append -c fwd1 -i port3 -o port4
 cubectl forwarder rule append -c fwd1 -i port4 -o port3
 ```
 
+
+
+## nat
+
+**nat**     Nat Cube Subcommands
+			**rule**        Nat Cube Rule Subcommands
+						**dnat**        Nat Cube Dnat Rule Subcommands
+									**append**      Append a dnat rule
+												-c, --cube string         cube name
+												--dstip string        dnat destination ipaddr (format ==no-cidr==: xxx.xxx.xxx.xxx)
+												--dstport string      dnat rule original dport
+												--proto string        dnat rule protocol < icmp | tcp | udp >
+												--to-dstip string     dnat rule target dstip (format ==no-cidr==: xxx.xxx.xxx.xxx)
+												--to-dstport string   dnat rule target dport (if ==default==, dport will not be changed)
+									**delete**      Delete a dnat rule
+												-c, --cube string      cube name
+												--dstip string     dnat destination ipaddr (format ==no-cidr==: xxx.xxx.xxx.xxx)
+												--dstport string   dnat rule original dport
+												--proto string     dnat rule protocol < icmp | tcp | udp >
+									**flush**       Flush all dnat rules
+												-c, --cube string   cube name
+
+​						**snat**        Nat Cube Snat Rule Subcommands
+​									**append**      Append a snat rule
+​												-c, --cube string           cube name
+​												--proto string          snat rule protocol < icmp | tcp | udp >
+​												--srcip string          snat rule original srcip (format ==cidr==: xxx.xxx.xxx.xxx/xx)
+​												--to-max-sport string   snat rule target sport max value
+​												--to-min-sport string   snat rule target sport min value
+​												--to-srcip string       snat rule target srcip (format ==no-cidr==: xxx.xxx.xxx.xxx)
+​									**delete**      Delete a snat rule
+​												-c, --cube string    cube name
+​												--proto string   snat rule protocol < icmp | tcp | udp >
+​												--srcip string   snat rule original srcip (format ==cidr==: xxx.xxx.xxx.xxx/xx)								
+​									**flush**       Flush all snat rules
+​												-c, --cube string   cube name
+
+​			**set**         Nat Cube Set Subcommands
+​						**snatport**    Set the default snat port range of a nat cube
+​									-c, --cube string   cube name
+​									--max string    max snat port
+​									--min string    min snat port
+
+​			**show**        Nat Cube Show Subcommands
+​						**rule**        Display all rules of a nat cube
+​									-c, --cube string   cube name
+​									-t, --type string   rule type < snat | dnat >
+
+## loadbalancer
+
+**loadbalancer**            Loadbalance Cube Subcommands
+            **group**       Loadbalance Cube Group Subcommands
+                        **add**         Add a loadbalancer group
+                                *GROUP_NAME*
+                                        --max-rule-num uint32   max rule num per rule type (==limit==: 20648) (==default== 8192)
+
+​                        **delete**      Delete a loadbalancer group
+​                                *GROUP_NAME*
+
+​            **rule**        Loadbalance Cube Rule Subcommands
+​                        **backend**     Loadbalance Cube Backend Rule Subcommands
+​                                **append**      Append a loadbalancer backend rule
+​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+​                                                --enable-snat            enable snat
+​                                                -g, --group                  if this flag is set, this is a group rule
+​                                                --ipaddr string          backend ipaddr
+​                                                --port string            backend port
+​                                                --snat-ip string         backend snat ipaddr
+​                                                --snat-max-port string   backend snat max port
+​                                                --snat-min-port string   backend snat min port
+
+​                                **delete**      Delete a loadbalancer backend rule
+​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+​                                                -g, --group           if this flag is set, this is a group rule
+​                                                --ipaddr string   backend ipaddr
+​                                                --port string     backend port
+
+​                                **flush**       Flush all loadbalancer backend rules of a service
+​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+​                                                -g, --group   if this flag is set, this is a group rule
+
+​                        **redirect**    Loadbalance Cube Redirect Rule Subcommands
+​                                **append**      Append a loadbalancer redirect rule
+​                                        *GROUP_OR_CUBE*
+​                                                -g, --group           if this flag is set, this is a group rule
+​                                                --iface string    redirect iface name
+​                                                --ipaddr string   redirect ipaddr
+
+​                                **delete**      Delete a loadbalancer redirect rule
+​                                        *GROUP_OR_CUBE*
+​                                                -g, --group           if this flag is set, this is a group rule
+​                                                --ipaddr string   redirect ipaddr
+
+​                                **flush**       Flush all loadbalancer redirect rules
+​                                        *GROUP_OR_CUBE*
+​                                                -g, --group           if this flag is set, this is a group rule
+
+​                        **service**     Loadbalance Cube Service Rule Subcommands
+​                                **append**      Append a loadbalancer service rule
+​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+​                                                -g, --group           if this flag is set, this is a group rule
+​                                                --ipaddr string   service virtual ipaddr
+​                                                --port string     service virtual port
+​                                                --proto string    service protocol < tcp | udp >
+
+​                                **delete**      Delete a loadbalancer service rule
+​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+​                                                -g, --group           if this flag is set, this is a group rule
+
+​                                **flush**       Flush all loadbalancer service rules
+​                                        *GROUP_OR_CUBE*
+​                                                -g, --group           if this flag is set, this is a group rule
+
+​            **set**         Loadbalance Cube Set Subcommands
+​                        **snat-rule**   Set the default snat rule of a cube or group
+​                                *GROUP_OR_CUBE*
+​                                        -g, --group             if this flag is set, this is a group rule
+​                                        --ipv4 string       default snat ipv4 addr
+​                                        --max-port string   default snat max port
+​                                        --min-port string   default snat min port
+
+​            **show**        Loadbalance Show Subcommands
+​                        **group**       Loadbalance Group Show Subcommands
+​                                **list**        Display a list of all groups
+​                                **info**        Display the details of a group
+​                                        *GROUP_NAME*
+
+​                        **redirect**    Display a list of all redirect rules
+​                                *GROUP_OR_CUBE*
+​                                        -g, --group   if this flag is set, this is a group rule
+
+​                        **service**     Loadbalance Service Rule Show Subcommands
+​                                **list**        Display a list of all service rules
+​                                        *GROUP_OR_CUBE*
+​                                                -g, --group   if this flag is set, this is a group rule
+​                                **info**        Display the details of a service rule
+​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+​                                                -g, --group   if this flag is set, this is a group rule

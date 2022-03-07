@@ -43,13 +43,22 @@
 
 ​						**loadbalancer**   		 Create a loadbalancer cube
 
-​									*CUBE_NAME*
+​								*CUBE_NAME*
+​                          --log-level string      trace log level < debug | info | warning | error | none >  (default "error")
+​                          --max-rule-num uint32   max rule num per rule type (limit: 20648) (default 8192)
+​                          --share-group string    share group name
+​                          --statistic-enable      statistic enable if set this flag
 
 
 
 ​						**nat**            					Create a nat cube
 
 ​									*CUBE_NAME*
+
+​                             --log-level string      trace log level < debug | info | warning | error | none >  (default "error")
+​                             --max-rule-num uint32   nat max rule num  (limit: 20648) (default 8192)
+​                             --statistic-enable      statistic enable if set this flag
+​                             -t, --type string           nat type < dnat | snat | both > (default "both")
 
 
 
@@ -726,7 +735,7 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 ​            **rule**        Loadbalance Cube Rule Subcommands
 ​                        **backend**     Loadbalance Cube Backend Rule Subcommands
 ​                                **append**      Append a loadbalancer backend rule
-​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+​                                        ==*GROUP_OR_CUBE* *SERVICE_NAME*==
 ​                                                --enable-snat            enable snat
 ​                                                -g, --group                  if this flag is set, this is a group rule
 ​                                                --ipaddr string          backend ipaddr
@@ -747,7 +756,7 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 
 ​                        **redirect**    Loadbalance Cube Redirect Rule Subcommands
 ​                                **append**      Append a loadbalancer redirect rule
-​                                        *GROUP_OR_CUBE*
+​                                        ==*GROUP_OR_CUBE*==
 ​                                                -g, --group           if this flag is set, this is a group rule
 ​                                                --iface string    redirect iface name
 ​                                                --ipaddr string   redirect ipaddr
@@ -763,7 +772,7 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 
 ​                        **service**     Loadbalance Cube Service Rule Subcommands
 ​                                **append**      Append a loadbalancer service rule
-​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+​                                        ==*GROUP_OR_CUBE* *SERVICE_NAME*==
 ​                                                -g, --group           if this flag is set, this is a group rule
 ​                                                --ipaddr string   service virtual ipaddr
 ​                                                --port string     service virtual port
@@ -802,3 +811,11 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 ​                                **info**        Display the details of a service rule
 ​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
 ​                                                -g, --group   if this flag is set, this is a group rule
+
+
+
+> *GROUP_OR_CUBE* ：
+>
+> （1）LB_CUBE_NAME			 cubectl loadbalancer set snat-rule lb0 --ipv4 1.2.3.4
+>
+> （2）-g GROUP_NAME			cubectl loadbalancer set snat-rule -g gp0 --ipv4 1.2.3.4

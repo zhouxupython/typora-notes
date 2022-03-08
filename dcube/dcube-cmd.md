@@ -776,7 +776,7 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 ​                                                -g, --group           if this flag is set, this is a group rule
 ​                                                --ipaddr string   service virtual ipaddr
 ​                                                --port string     service virtual port
-​                                                --proto string    service protocol < tcp | udp >
+​                                                --==proto== string    service protocol < tcp | udp >
 
 ​                                **delete**      Delete a loadbalancer service rule
 ​                                        *GROUP_OR_CUBE* *SERVICE_NAME*

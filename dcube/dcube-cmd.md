@@ -44,7 +44,7 @@
 ​						**loadbalancer**   		 Create a loadbalancer cube
 
 ​								*CUBE_NAME*
-​                          --log-level string      trace log level < debug | info | warning | error | none >  (default "error")
+​                          --log-level string     trace log level < debug | info | warning | ==error== | none >  (default "error")
 ​                          --max-rule-num uint32   max rule num per rule type (limit: 20648) (default 8192)
 ​                          --share-group string    share group name
 ​                          --statistic-enable      statistic enable if set this flag
@@ -788,7 +788,7 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 
 ​            **set**         Loadbalance Cube Set Subcommands
 ​                        **snat-rule**   Set the default snat rule of a cube or group
-​                                *GROUP_OR_CUBE*
+​                                ==*GROUP_OR_CUBE*==
 ​                                        -g, --group             if this flag is set, this is a group rule
 ​                                        --ipv4 string       default snat ipv4 addr
 ​                                        --max-port string   default snat max port
@@ -798,18 +798,18 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 ​                        **group**       Loadbalance Group Show Subcommands
 ​                                **list**        Display a list of all groups
 ​                                **info**        Display the details of a group
-​                                        *GROUP_NAME*
+​                                        ==*GROUP_NAME*==
 
 ​                        **redirect**    Display a list of all redirect rules
-​                                *GROUP_OR_CUBE*
+​                                ==*GROUP_OR_CUBE*==
 ​                                        -g, --group   if this flag is set, this is a group rule
 
 ​                        **service**     Loadbalance Service Rule Show Subcommands
 ​                                **list**        Display a list of all service rules
-​                                        *GROUP_OR_CUBE*
+​                                        ==*GROUP_OR_CUBE*==
 ​                                                -g, --group   if this flag is set, this is a group rule
 ​                                **info**        Display the details of a service rule
-​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+​                                        ==*GROUP_OR_CUBE* *SERVICE_NAME*==
 ​                                                -g, --group   if this flag is set, this is a group rule
 
 

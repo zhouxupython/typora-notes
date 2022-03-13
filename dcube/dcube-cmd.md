@@ -2,7 +2,7 @@
 
 ## cube
 
-**cube**		Cube Common Subcommands 
+**cube**		Cube Common Subcommands
 
 ​			**create**      Create a cube							
 
@@ -99,7 +99,7 @@
 ​	                	// attach cube0 to eth0
 ​	                	$ cubectl cube attach cube0 eth0
 ​	                	// attach cube1 to eth0 and its location is after cube0 which is attached
-​	                	$ cubectl cube attach cube0 eth0 --location=after:cube0	
+​	                	$ cubectl cube attach cube0 eth0 --location=after:cube0
 
 ​			**detach**      Detach a transparent cube from the physical port
 
@@ -149,7 +149,7 @@
 
 
 
-​    		**statistics**      Cube Statistics Subcommands, depends on whether use --statistic-enable on cube create 
+​    		**statistics**      Cube Statistics Subcommands, depends on whether use --statistic-enable on cube create
 
 ​      				    **clear**       Clear statistics of a cube
 
@@ -165,7 +165,7 @@
 
 ​      		 			*CUBE_TYPE*
 
-​						    	currently supported cube types : 
+​						    	currently supported cube types :
 
 ​											ddos-mitigator (dm) | firewall (fw) | slimfirewall (slimfw) | nat | forwarder (fwd)
 
@@ -182,7 +182,7 @@
 ​	 		  **list**        Display a list of all cubes of a certain type
 
 ​			   			 *CUBE_TYPE*
-​										currently supported types : 
+​										currently supported types :
 
 ​													ddos-mitigator | firewall | slimfirewall | nat | forwarder | packetcapture
 
@@ -208,6 +208,7 @@
 ​                                          --proto string      rule protocol < icmp | tcp | udp >
 ​                                          --srcport string    rule source port
 ​                                          --tcpflags string   rule tcpflags  < urg,ack,psh,rst,syn,fin,ece,cwr > (multiple flags are separated by ',')
+
 ​                    **batch-append** Batch append ddos-mitigator rules
 ​                                    -c, --cube string   cube name
 ​                                    -f, --file string   configure file (json)
@@ -226,7 +227,9 @@
 ​                            -c, --cube string   cube name
 ​                            -t, --type string   rule type < l3 | l4 | all >
 
-​            **set**         DDoS-mitigator Cube Set Subcommands
+
+
+​             **set**         DDoS-mitigator Cube Set Subcommands
 ​                    **ratelimit**   Set the ratelimit parameters of the ddos-mitigator cube
 ​                            **mode**        Set the ratelimit mode of the ddos-mitigator cube
 ​                                    -c, --cube string   cube name
@@ -239,7 +242,9 @@
 ​                            -c, --cube string   cube name
 ​                            -m, --mode string   work mode < normal | black-hole >  (default "normal")
 
-​            **show**        DDoS-mitigator Cube Show Subcommands
+
+
+​             **show**        DDoS-mitigator Cube Show Subcommands
 ​                    **rule**        Display all rules of the ddos-mitigator cube
 ​                            -c, --cube string   cube name
 ​                            -t, --type string   rule type < l3 | l4 | all >
@@ -286,18 +291,18 @@ next-map      : 0     next-prog     : 0
 ------------------------------------------------------------
 ddos-mitigator private info
 ------------------------------------------------------------
-hook <ingress > : 
+hook <ingress > :
     workmode       : normal  
     l3-rule-max    : 8192  l3-rule-num : 0   
     l4-rule-max    : 8192  l4-rule-num : 0   
-    ratelimt-mode  : disable 
+    ratelimt-mode  : disable
     ratelimt-value : icmp : 0  udp : 0  tcp : 0
 
 ```
 
 ```shell
-zx@zx-dcube1:~$ cubectl cube create ddos-mitigator d1 --type tc 
- 
+zx@zx-dcube1:~$ cubectl cube create ddos-mitigator d1 --type tc
+
 zx@zx-dcube1:~$ cubectl cube  show  info d1
 
 ------------------------------------------------------------
@@ -315,11 +320,11 @@ next-map      : 0     next-prog     : 0
 ------------------------------------------------------------
 ddos-mitigator private info
 ------------------------------------------------------------
-hook <ingress > : 
+hook <ingress > :
     workmode       : normal  
     l3-rule-max    : 8192  l3-rule-num : 0   
     l4-rule-max    : 8192  l4-rule-num : 0   
-    ratelimt-mode  : disable 
+    ratelimt-mode  : disable
     ratelimt-value : icmp : 0  udp : 0  tcp : 0
 ```
 
@@ -335,7 +340,7 @@ Examples:
 	$ cubectl cube attach cube0 eth0
 	# attach cube1 to eth0 and its location is after cube0 which is attached
 	$ cubectl cube attach cube0 eth0 --location=after:cube0
-	
+
 
 Flags:
   -h, --help                help for attach
@@ -416,11 +421,15 @@ Flags:
 ​                                  --srcport string     source port
 ​                                  --tcpflags string    tcpflags  < urg,ack,psh,rst,syn,fin,ece,cwr > (multiple flags are separated by ',')
 
+
+
 ​            **set**         Firewall Cube Set Subcommands
 ​                    **action**      Set firewall ==default== action (==only== for normal work mode)
 ​                            -a, --action string      default action < ==accept== | deny > (only for normal work mode)
 ​                            -c, --cube string        cube name
 ​                                  --direction string   rule direction < ingress | egress >
+
+
 
 ​            **show**        Firewall Cube Show Subcommands
 ​                    **rule**        Display all rules of a firewall cube
@@ -451,14 +460,12 @@ Flags:
 
 
 
-
-
 ```shell
 zx@zx-dcube1:~$ cubectl cube create firewall fw1 --workmode=normal
 
 zx@zx-dcube1:~$ cubectl cube  show  list fw
 
-firewall         cube list <num=1> 
+firewall         cube list <num=1>
 ------------------------------------------------------------
 id: 0            name: fw1     
 
@@ -468,7 +475,7 @@ zx@zx-dcube1:~/works/dcube-tmp/tests$ cubectl cube  show  info fw1
               transparent cube <fw1> basic info
 ------------------------------------------------------------
 cube-type     : firewall  statistic     : false   
-prog-type     : tc        hook-type     : tc-both 
+prog-type     : tc        hook-type     : tc-both
 log-level     : error     attach-status : none    
 ------------------------------------------------------------
                 hook <ingress> basic info
@@ -487,9 +494,9 @@ next-map      : 0     next-prog     : 1
 ------------------------------------------------------------
 work-mode    : normal     conntrack          : auto    
 max-rule-num : 4196   max-conntrack-num  : 65536
-hook <ingress > : 
+hook <ingress > :
     default-action: accept  rule-num: 0      loop-num: 0   
-hook <egress  > : 
+hook <egress  > :
     default-action: accept  rule-num: 0      loop-num: 0   
 ```
 
@@ -501,7 +508,7 @@ work-mode    		: 		==normal==
 
 conntrack         	 : 		==auto==      
 
-default-action		:	 	==accept== 
+default-action		:	 	==accept==
 
 
 
@@ -544,11 +551,15 @@ default action				cubectl firewall set action
 ​                            -c, --cube string        cube name
 ​                                 --direction string   rule direction < ingress | egress >
 
+
+
 ​            **set**         SlimFirewall Cube Set Subcommands
 ​                    **action**      Set slimfirewall global action
 ​                            -a, --action string      global action < accept-all | deny-all | normal >
 ​                            -c, --cube string        cube name
 ​                                 --direction string   rule direction < ingress | egress >
+
+
 
 ​            **show**        SlimFirewall Cube Show Subcommands
 ​                    **rule**        Display all rules of a slimfirewall cube
@@ -583,7 +594,7 @@ zx@zx-dcube1:~$ cubectl cube create slimfirewall sfw1
 
 zx@zx-dcube1:~$ cubectl cube show list slimfirewall
 
-slimfirewall     cube list <num=1> 
+slimfirewall     cube list <num=1>
 ------------------------------------------------------------
 id: 0            name: sfw1    
 
@@ -594,7 +605,7 @@ zx@zx-dcube1:$ cubectl cube  show  info sfw1
               transparent cube <sfw1> basic info
 ------------------------------------------------------------
 cube-type     : slimfirewall  statistic     : false   
-prog-type     : tc        hook-type     : tc-both 
+prog-type     : tc        hook-type     : tc-both
 log-level     : error     attach-status : none    
 ------------------------------------------------------------
                 hook <ingress> basic info
@@ -613,9 +624,9 @@ next-map      : 0     next-prog     : 1
 ------------------------------------------------------------
 work-mode    : whitelist   conntrack          : auto        k8s: false
 max-rule-num : 8192   max-conntrack-num  : 65536
-hook <ingress >  : 
+hook <ingress >  :
     global-action  : normal  rule-num  : 0   
-hook <egress  > : 
+hook <egress  > :
     global-action  : normal  rule-num  : 0   
 
 ```
@@ -733,6 +744,24 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 ​                                *GROUP_NAME*
 
 ​            **rule**        Loadbalance Cube Rule Subcommands
+
+​                       **service**     Loadbalance Cube Service Rule Subcommands
+​                                **append**      Append a loadbalancer service rule
+​                                        ==*GROUP_OR_CUBE* *SERVICE_NAME*==
+​                                                -g, --group           if this flag is set, this is a group rule
+​                                                --ipaddr string   service virtual ipaddr
+​                                                --port string     service virtual port
+​                                                --==proto== string    service protocol < tcp | udp >
+
+​                                **delete**      Delete a loadbalancer service rule
+​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
+
+​                                                -g, --group           if this flag is set, this is a group rule
+
+​                                **flush**       Flush all loadbalancer service rules
+​                                        *GROUP_OR_CUBE*
+​                                                -g, --group           if this flag is set, this is a group rule
+
 ​                        **backend**     Loadbalance Cube Backend Rule Subcommands
 ​                                **append**      Append a loadbalancer backend rule
 ​                                        ==*GROUP_OR_CUBE* *SERVICE_NAME*==
@@ -770,21 +799,7 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 ​                                        *GROUP_OR_CUBE*
 ​                                                -g, --group           if this flag is set, this is a group rule
 
-​                        **service**     Loadbalance Cube Service Rule Subcommands
-​                                **append**      Append a loadbalancer service rule
-​                                        ==*GROUP_OR_CUBE* *SERVICE_NAME*==
-​                                                -g, --group           if this flag is set, this is a group rule
-​                                                --ipaddr string   service virtual ipaddr
-​                                                --port string     service virtual port
-​                                                --==proto== string    service protocol < tcp | udp >
 
-​                                **delete**      Delete a loadbalancer service rule
-​                                        *GROUP_OR_CUBE* *SERVICE_NAME*
-​                                                -g, --group           if this flag is set, this is a group rule
-
-​                                **flush**       Flush all loadbalancer service rules
-​                                        *GROUP_OR_CUBE*
-​                                                -g, --group           if this flag is set, this is a group rule
 
 ​            **set**         Loadbalance Cube Set Subcommands
 ​                        **snat-rule**   Set the default snat rule of a cube or group

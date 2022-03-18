@@ -1046,6 +1046,7 @@ likely(skb_dst(skb)->output == ip6_output) ? ip6_output(net, sk, skb) :
 
 ```c
 // net/ipv4/ip_output.c
+// 将要从本地发出的数据包
 int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct iphdr *iph = ip_hdr(skb);
@@ -1072,21 +1073,132 @@ int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 
 ### POSTROUTING
 
+[IP输出 之 ip_output、ip_finish_output、ip_finish_output2](https://www.cnblogs.com/wanpengcoder/p/11755363.html)
+
+[ip分组输出函数ip_output()小结](https://blog.csdn.net/cycuest/article/details/1604817)
+
 ```c
 // net/ipv4/ip_output.c
+// 设置输出设备和协议
 int ip_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct net_device *dev = skb_dst(skb)->dev, *indev = skb->dev;
 
 	IP_UPD_PO_STATS(net, IPSTATS_MIB_OUT, skb->len);
-
+	
+    /* 设置输出设备和协议 */
 	skb->dev = dev;
 	skb->protocol = htons(ETH_P_IP);
 
-	return NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING,
+	return NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING,	// 【NF_INET_POST_ROUTING】
 			    net, sk, skb, indev, dev,
 			    ip_finish_output,
 			    !(IPCB(skb)->flags & IPSKB_REROUTED));
+}
+
+static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+	int ret;
+
+	ret = BPF_CGROUP_RUN_PROG_INET_EGRESS(sk, skb);// ???
+	switch (ret) {
+	case NET_XMIT_SUCCESS:
+		return __ip_finish_output(net, sk, skb);
+	case NET_XMIT_CN:
+		return __ip_finish_output(net, sk, skb) ? : ret;
+	default:
+		kfree_skb(skb);
+		return ret;
+	}
+}
+
+// include/linux/bpf-cgroup.h
+#define BPF_CGROUP_RUN_PROG_INET_EGRESS(sk, skb)			       \
+({									       \
+	int __ret = 0;							       \
+	if (cgroup_bpf_enabled(BPF_CGROUP_INET_EGRESS) && sk && sk == skb->sk) { \
+		typeof(sk) __sk = sk_to_full_sk(sk);			       \
+		if (sk_fullsock(__sk))					       \
+			__ret = __cgroup_bpf_run_filter_skb(__sk, skb,	       \
+						      BPF_CGROUP_INET_EGRESS); \
+	}								       \
+	__ret;								       \
+})
+
+static int __ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+	unsigned int mtu;
+
+#if defined(CONFIG_NETFILTER) && defined(CONFIG_XFRM)
+	/* Policy lookup after SNAT yielded a new policy */
+	if (skb_dst(skb)->xfrm) {
+		IPCB(skb)->flags |= IPSKB_REROUTED;
+		return dst_output(net, sk, skb);
+	}
+#endif
+	mtu = ip_skb_dst_mtu(sk, skb);/* 获取mtu */
+	if (skb_is_gso(skb))/* 是gso，则调用gso输出 */
+		return ip_finish_output_gso(net, sk, skb, mtu);
+
+	if (skb->len > mtu || IPCB(skb)->frag_max_size)/* 长度>mtu或者设置了IPSKB_FRAG_PMTU标记，则分片 */
+		return ip_fragment(net, sk, skb, mtu, ip_finish_output2);
+
+	return ip_finish_output2(net, sk, skb);/* 输出数据包 */
+}
+
+static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+	struct dst_entry *dst = skb_dst(skb);
+	struct rtable *rt = (struct rtable *)dst;
+	struct net_device *dev = dst->dev;
+	unsigned int hh_len = LL_RESERVED_SPACE(dev);
+	struct neighbour *neigh;
+	bool is_v6gw = false;
+
+	if (rt->rt_type == RTN_MULTICAST) {
+		IP_UPD_PO_STATS(net, IPSTATS_MIB_OUTMCAST, skb->len);
+	} else if (rt->rt_type == RTN_BROADCAST)
+		IP_UPD_PO_STATS(net, IPSTATS_MIB_OUTBCAST, skb->len);
+
+	/* Be paranoid, rather than too clever. */
+	if (unlikely(skb_headroom(skb) < hh_len && dev->header_ops)) {
+		struct sk_buff *skb2;
+
+		skb2 = skb_realloc_headroom(skb, LL_RESERVED_SPACE(dev));
+		if (!skb2) {
+			kfree_skb(skb);
+			return -ENOMEM;
+		}
+		if (skb->sk)
+			skb_set_owner_w(skb2, skb->sk);
+		consume_skb(skb);
+		skb = skb2;
+	}
+
+	if (lwtunnel_xmit_redirect(dst->lwtstate)) {
+		int res = lwtunnel_xmit(skb);
+
+		if (res < 0 || res == LWTUNNEL_XMIT_DONE)
+			return res;
+	}
+
+	rcu_read_lock_bh();
+	neigh = ip_neigh_for_gw(rt, skb, &is_v6gw);
+	if (!IS_ERR(neigh)) {
+		int res;
+
+		sock_confirm_neigh(skb, neigh);
+		/* if crossing protocols, can not use the cached header */
+		res = neigh_output(neigh, skb, is_v6gw);
+		rcu_read_unlock_bh();
+		return res;
+	}
+	rcu_read_unlock_bh();
+
+	net_dbg_ratelimited("%s: No header cache and no neighbour!\n",
+			    __func__);
+	kfree_skb(skb);
+	return -EINVAL;
 }
 ```
 
@@ -1156,7 +1268,7 @@ NF_HOOK_COND(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk, st
 {
 	int ret;
 	// 【注意这里的逻辑】NF_HOOK_COND增加了一个输入条件cond，
-    // 当不满足条件的时候，直接调用okfn；
+    // 当不满足条件的时候，直接调用okfn，不调用nf_hook；
     // 满足条件的时候，才会继续调用nf_hook进行后续的钩子函数调用流程，如果nf_hook返回1，则调用okfn
 	if (!cond ||
 	    ((ret = nf_hook(pf, hook, net, sk, skb, in, out, okfn)) == 1))
@@ -1192,6 +1304,7 @@ __netif_receive_skb_core
                                     ip_forward_finish
                                         dst_output	// 即将发送的数据如何处理，ip6_output、ip_output.......
                                             ip_output
+                                        		BPF_CGROUP_RUN_PROG_INET_EGRESS // ???
 ```
 
 #### 发包NF hooks链

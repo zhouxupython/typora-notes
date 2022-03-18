@@ -742,7 +742,28 @@ static inline void skb_dst_set(struct sk_buff *skb, struct dst_entry *dst)
 {
 	skb->_skb_refdst = (unsigned long)dst;
 }	
-	
+
+// net/ipv4/route.c
+struct rtable *rt_dst_alloc(struct net_device *dev,
+			    unsigned int flags, u16 type,
+			    bool nopolicy, bool noxfrm)
+{
+	struct rtable *rt;
+
+	rt = dst_alloc(&ipv4_dst_ops, dev, 1, DST_OBSOLETE_FORCE_CHK,
+		       (nopolicy ? DST_NOPOLICY : 0) |
+		       (noxfrm ? DST_NOXFRM : 0));
+
+	if (rt) {
+
+		rt->dst.output = ip_output;
+		if (flags & RTCF_LOCAL)
+			rt->dst.input = ip_local_deliver;
+	}
+
+	return rt;
+}
+
 
 ip_rcv_finish				// 当前是【PREROUTING】
     ip_rcv_finish_core
@@ -751,13 +772,15 @@ ip_rcv_finish				// 当前是【PREROUTING】
                 ip_route_input_slow
                     rt_dst_alloc(flags | RTCF_LOCAL)
                         rt->dst.input = ip_local_deliver;	// 决定走向【INPUT】
+						rt->dst.output = ip_output;			// 还注册了output函数
                     skb_dst_set(skb, &rth->dst);
 
                     ip_mkroute_input	
                         __mkroute_input        
                             rth->dst.input = ip_forward;	// 决定走向【FORWARD】
                             skb_dst_set(skb, &rth->dst);
-    dst_input(skb)              // 根据包的设置，最终走向。。。。       
+
+    dst_input(skb)              							// 根据包的设置，最终走向。。。。       
 
 	            
 	
@@ -1044,15 +1067,41 @@ likely(skb_dst(skb)->output == ip6_output) ? ip6_output(net, sk, skb) :
 
 ### OUTPUT
 
+[IP输出 之 ip_local_out](https://www.cnblogs.com/wanpengcoder/p/11755355.html)
+
 ```c
+// ip_queue_xmit是ip层提供给tcp层的发送回调，大多数tcp发送都会使用这个回调，tcp层使用tcp_transmit_skb封装了tcp头之后，调用该函数，该函数提供了路由查找校验、封装ip头和ip选项的功能，封装完成之后调用ip_local_out发送数据包；
+tcp_transmit_skb
+    __tcp_transmit_skb
+    	ip_queue_xmit
+    		__ip_queue_xmit
+    			ip_local_out
+
+
+
 // net/ipv4/ip_output.c
-// 将要从本地发出的数据包
+// 将要从本地发出的数据包，会在构造了ip头之后，调用ip_local_out函数，
+// 该函数设置数据包的总长度和校验和，然后经过netfilter的LOCAL_OUT钩子点进行检查过滤，
+// 如果通过，则调用dst_output函数（该函数分析就在上面），实际上调用的是ip数据包输出函数ip_output；
+int ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+    int err;
+
+    /* 设置几个必要字段，经过NF的LOCAL_OUT钩子点 */
+    err = __ip_local_out(net, sk, skb);
+
+    /* NF允许包通过，但需要显示调用回调函数 */
+    if (likely(err == 1))
+        err = dst_output(net, sk, skb);// 这里如果是 ip_output，则会进入【NF_INET_POST_ROUTING】
+
+    return err;
+}
 int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct iphdr *iph = ip_hdr(skb);
 
-	iph->tot_len = htons(skb->len);
-	ip_send_check(iph);
+	iph->tot_len = htons(skb->len);/* 设置总长度 */
+	ip_send_check(iph);/* 计算校验和 */
 
 	/* if egress device is enslaved to an L3 master device pass the
 	 * skb to its handler for processing
@@ -1061,11 +1110,25 @@ int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 	if (unlikely(!skb))
 		return 0;
 
-	skb->protocol = htons(ETH_P_IP);
+	skb->protocol = htons(ETH_P_IP);/* 设置ip协议  设置skb->protocol协议为IP，注意这里不是设置IP头部的protocol字段 */
 
-	return nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT,
+	return nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT,		// 【NF_INET_LOCAL_OUT】
 		       net, sk, skb, NULL, skb_dst(skb)->dev,
 		       dst_output);
+}
+
+// 全局搜索 dst.output  就能看到所有的可能函数
+static inline int dst_output(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+	return INDIRECT_CALL_INET(skb_dst(skb)->output,
+				  ip6_output, ip_output,
+				  net, sk, skb);// 这里如果是 ip_output，则会进入【NF_INET_POST_ROUTING】
+
+/*
+--->
+likely(skb_dst(skb)->output == ip6_output) ? ip6_output(net, sk, skb) :
+				  likely(skb_dst(skb)->output == ip_output) ? ip_output(net, sk, skb) : skb_dst(skb)->output(net, sk, skb);
+*/
 }
 ```
 
@@ -1076,6 +1139,8 @@ int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 [IP输出 之 ip_output、ip_finish_output、ip_finish_output2](https://www.cnblogs.com/wanpengcoder/p/11755363.html)
 
 [ip分组输出函数ip_output()小结](https://blog.csdn.net/cycuest/article/details/1604817)
+
+[Linux内核数据包L3层转发处理流程](https://blog.csdn.net/hhhhhyyyyy8/article/details/102024487)
 
 ```c
 // net/ipv4/ip_output.c
@@ -1088,7 +1153,7 @@ int ip_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 	
     /* 设置输出设备和协议 */
 	skb->dev = dev;
-	skb->protocol = htons(ETH_P_IP);
+	skb->protocol = htons(ETH_P_IP);	//设置skb->protocol协议为IP，注意这里不是设置IP头部的protocol字段
 
 	return NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING,	// 【NF_INET_POST_ROUTING】
 			    net, sk, skb, indev, dev,
@@ -1136,16 +1201,20 @@ static int __ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *
 		return dst_output(net, sk, skb);
 	}
 #endif
+    
 	mtu = ip_skb_dst_mtu(sk, skb);/* 获取mtu */
 	if (skb_is_gso(skb))/* 是gso，则调用gso输出 */
 		return ip_finish_output_gso(net, sk, skb, mtu);
-
+	
+    /*GSO:网卡在支持GSO功能时，对于超大数据包（大于MTU值），内核会将分段的工作延迟到交给驱动的前一刻。
+    如果网卡不支持此功能，则内核用软件的方式对数据包进行分片。
+	如果报文长度大于MTU，并且网卡不支持GSO，则进行报文分片*/
 	if (skb->len > mtu || IPCB(skb)->frag_max_size)/* 长度>mtu或者设置了IPSKB_FRAG_PMTU标记，则分片 */
 		return ip_fragment(net, sk, skb, mtu, ip_finish_output2);
 
 	return ip_finish_output2(net, sk, skb);/* 输出数据包 */
 }
-
+//通过邻居子系统将数据报输出到网络设备。
 static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
@@ -1154,13 +1223,15 @@ static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *s
 	unsigned int hh_len = LL_RESERVED_SPACE(dev);
 	struct neighbour *neigh;
 	bool is_v6gw = false;
-
+	
+    //组播
 	if (rt->rt_type == RTN_MULTICAST) {
 		IP_UPD_PO_STATS(net, IPSTATS_MIB_OUTMCAST, skb->len);
 	} else if (rt->rt_type == RTN_BROADCAST)
 		IP_UPD_PO_STATS(net, IPSTATS_MIB_OUTBCAST, skb->len);
 
 	/* Be paranoid, rather than too clever. */
+	/*检测skb的前部空间是否还能够存储链路层首部，如果不够，则重新分配更大存储区的skb，并释放原skb.*/
 	if (unlikely(skb_headroom(skb) < hh_len && dev->header_ops)) {
 		struct sk_buff *skb2;
 
@@ -1189,6 +1260,11 @@ static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *s
 
 		sock_confirm_neigh(skb, neigh);
 		/* if crossing protocols, can not use the cached header */
+        /*
+        调用neigh_output输出报文，在这个函数中，进行判断：
+			如果缓存了链路层首部，则调用neigh_hh_output输出报文；
+			若存在对应的邻居项，则通过邻居项的输出方法输出数据报
+		*/
 		res = neigh_output(neigh, skb, is_v6gw);
 		rcu_read_unlock_bh();
 		return res;
@@ -1199,6 +1275,57 @@ static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *s
 			    __func__);
 	kfree_skb(skb);
 	return -EINVAL;
+}
+
+static inline int neigh_output(struct neighbour *n, struct sk_buff *skb,
+			       bool skip_cache)
+{
+	const struct hh_cache *hh = &n->hh;
+
+	if ((n->nud_state & NUD_CONNECTED) && hh->hh_len && !skip_cache)
+		return neigh_hh_output(hh, skb);
+	else
+		return n->output(n, skb);
+}
+
+static inline int neigh_hh_output(const struct hh_cache *hh, struct sk_buff *skb)
+{
+	unsigned int hh_alen = 0;
+	unsigned int seq;
+	unsigned int hh_len;
+
+	do {
+		seq = read_seqbegin(&hh->hh_lock);
+		hh_len = READ_ONCE(hh->hh_len);
+		if (likely(hh_len <= HH_DATA_MOD)) {
+			hh_alen = HH_DATA_MOD;
+
+			/* skb_push() would proceed silently if we have room for
+			 * the unaligned size but not for the aligned size:
+			 * check headroom explicitly.
+			 */
+			if (likely(skb_headroom(skb) >= HH_DATA_MOD)) {
+				/* this is inlined by gcc */
+				memcpy(skb->data - HH_DATA_MOD, hh->hh_data,
+				       HH_DATA_MOD);
+			}
+		} else {
+			hh_alen = HH_DATA_ALIGN(hh_len);
+
+			if (likely(skb_headroom(skb) >= hh_alen)) {
+				memcpy(skb->data - hh_alen, hh->hh_data,
+				       hh_alen);
+			}
+		}
+	} while (read_seqretry(&hh->hh_lock, seq));
+
+	if (WARN_ON_ONCE(skb_headroom(skb) < hh_alen)) {
+		kfree_skb(skb);
+		return NET_XMIT_DROP;
+	}
+
+	__skb_push(skb, hh_len);
+	return dev_queue_xmit(skb);
 }
 ```
 
@@ -1282,6 +1409,25 @@ NF_HOOK_COND(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk, st
 #### 收包NF hooks链
 
 ```c
+// 路径
+ip_rcv_finish				// 当前是【PREROUTING】
+    ip_rcv_finish_core
+        ip_route_input_noref
+            ip_route_input_rcu
+                ip_route_input_slow
+                    rt_dst_alloc(flags | RTCF_LOCAL)
+                        rt->dst.input = ip_local_deliver;	// 决定走向【INPUT】
+						rt->dst.output = ip_output;			// 还注册了output函数
+                    skb_dst_set(skb, &rth->dst);
+
+                    ip_mkroute_input	
+                        __mkroute_input        
+                            rth->dst.input = ip_forward;	// 决定走向【FORWARD】
+                            skb_dst_set(skb, &rth->dst);
+
+    dst_input(skb)              							// 根据包的设置，最终走向。。。。       
+
+
 // 调用链
 __netif_receive_skb_core
     deliver_ptype_list_skb
@@ -1291,20 +1437,44 @@ __netif_receive_skb_core
                     nf_hook
                         nf_hook_slow
                     ip_rcv_finish
+						ip_rcv_finish_core
                         dst_input		// 收到的数据如何处理，ip6_input、ip_local_deliver、ip_forward.......
-                            ip_local_deliver
+                            ip_local_deliver		// 决定走向【INPUT】
                                 NF_HOOK(NFPROTO_IPV4, NF_INET_LOCAL_IN, , ip_local_deliver_finish // NF_INET_LOCAL_IN
                                     nf_hook
                                         nf_hook_slow
                                     ip_local_deliver_finish
-							ip_forward
+							ip_forward				// 决定走向【FORWARD】
 							    NF_HOOK(NFPROTO_IPV4, NF_INET_FORWARD, , ip_forward_finish  // NF_INET_FORWARD
                                     nf_hook
                                         nf_hook_slow
                                     ip_forward_finish
                                         dst_output	// 即将发送的数据如何处理，ip6_output、ip_output.......
                                             ip_output
-                                        		BPF_CGROUP_RUN_PROG_INET_EGRESS // ???
+                                                NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING, , ip_finish_output	
+                                                    nf_hook
+                                                    ip_finish_output
+                                                        BPF_CGROUP_RUN_PROG_INET_EGRESS   ？？？
+                                                        __ip_finish_output
+                                                            ip_finish_output2
+                                                                neigh_output
 ```
 
 #### 发包NF hooks链
+
+```c
+ip_local_out
+    __ip_local_out
+        nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT,			// NF_INET_LOCAL_OUT
+            nf_hook_slow    
+    dst_output
+        ip_output
+            NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING, , ip_finish_output		// NF_INET_POST_ROUTING
+                nf_hook
+                ip_finish_output
+                    BPF_CGROUP_RUN_PROG_INET_EGRESS  //  ？？？
+                    __ip_finish_output
+                        ip_finish_output2
+                            neigh_output
+```
+

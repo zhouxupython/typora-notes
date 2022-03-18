@@ -303,3 +303,9 @@ static inline int deliver_skb(struct sk_buff *skb,
 }
 ```
 
+[linux网卡报文接收流程](https://blog.csdn.net/hhhhhyyyyy8/article/details/102492680)
+
+[原创                   Linux内核分析 - 网络[二\]：网卡驱动接收报文                       ](https://blog.csdn.net/qy532846454/article/details/6288261)
+
+[原创                   Linux内核分析 - 网络[三\]：从netif_receive_skb()说起                       ](https://blog.csdn.net/qy532846454/article/details/6339789)
+

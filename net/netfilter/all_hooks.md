@@ -504,6 +504,8 @@ ip层收包流程概述：
 
 (5) 经过PRE_ROUTING钩子点之后，调用ip_rcv_finish完成数据包接收，包括选项处理，路由查询，并且根据路由决定数据包是***发往本机***还是***转发***
 
+当二层收包结束后，会根据注册的协议和回调函数分发数据包，其中ipv4的数据包会分发到ip_rcv函数进行三层协议栈处理，该函数对数据包的合法性进行检查，并且设置一些必要字段之后，经过PRE_ROUTING钩子点；
+
 ```c
 // net/core/dev.c	链接packet_type类型
 struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
@@ -796,6 +798,8 @@ ip_rcv_finish				// 当前是【PREROUTING】
 
 [IP 层收发报文简要剖析2--ip报文的输入ip_local_deliver](https://www.cnblogs.com/codestack/p/9194808.html)
 
+上面的ip_rcv函数在经过了PRE_ROUTING钩子点之后，会调用ip_rcv_finish函数，该函数的主要功能是查路由，决定数据包是输入到本地还是转发，并调用dst_input函数；当数据包输入本地时，dst_input函数实际调用了ip_local_deliver函数，函数首先对分片进行检查，如果是分片则需要进行重组，然后经过NF_INET_LOCAL_IN钩子点，之后调用ip_local_deliver_finish继续进行输入本地的其他工作；
+
 ```c
 // net/ipv4/ip_input.c
 /*
@@ -994,6 +998,8 @@ static const struct net_protocol tcp_protocol = {
 
 [IP 层收发报文简要剖析6--ip_forward 报文转发](https://www.cnblogs.com/codestack/p/9266122.html)
 
+上面的ip_rcv函数在经过了PRE_ROUTING钩子点之后，会调用ip_rcv_finish函数，该函数的主要功能是查路由，决定数据包是输入到本地还是转发，并调用dst_input函数；当数据包输入本地时，dst_input函数实际调用了ip_forward函数，函数数据包进行合法性检查，然后经过NF_INET_FORWARD钩子点，之后调用ip_forward_finish继续进行转发的其他工作，ip_forward_finish在输出数据包的时候，实际上又调用dst_output，实际上就是ip_output函数；
+
 ```c
 // net/ipv4/ip_forward.c
 //在函数ip_route_input_slow->ip_mkroute_input注册，
@@ -1069,8 +1075,14 @@ likely(skb_dst(skb)->output == ip6_output) ? ip6_output(net, sk, skb) :
 
 [IP输出 之 ip_local_out](https://www.cnblogs.com/wanpengcoder/p/11755355.html)
 
+[TCP->IP输出 之 ip_queue_xmit、ip_build_and_send_pkt、ip_send_unicast_reply](https://www.cnblogs.com/wanpengcoder/p/11755349.html)
+
+从本机发出的数据包，在查询路由成功之后，会调用__ip_local_out函数，函数首先进行必要字段设置和校验和计算，然后经过NF_INET_LOCAL_OUT钩子点，之后会调用dst_output继续完成数据包输出的其他工作，ipv4的路由输出函数实际上就是ip_output函数；
+
 ```c
-// ip_queue_xmit是ip层提供给tcp层的发送回调，大多数tcp发送都会使用这个回调，tcp层使用tcp_transmit_skb封装了tcp头之后，调用该函数，该函数提供了路由查找校验、封装ip头和ip选项的功能，封装完成之后调用ip_local_out发送数据包；
+// ip_queue_xmit是ip层提供给tcp层的发送回调，大多数tcp发送都会使用这个回调，
+// tcp层使用tcp_transmit_skb封装了tcp头之后，调用该函数，该函数提供了路由查找校验、封装ip头和ip选项的功能，
+// 封装完成之后调用ip_local_out发送数据包；
 tcp_transmit_skb
     __tcp_transmit_skb
     	ip_queue_xmit
@@ -1141,6 +1153,8 @@ likely(skb_dst(skb)->output == ip6_output) ? ip6_output(net, sk, skb) :
 [ip分组输出函数ip_output()小结](https://blog.csdn.net/cycuest/article/details/1604817)
 
 [Linux内核数据包L3层转发处理流程](https://blog.csdn.net/hhhhhyyyyy8/article/details/102024487)
+
+转发的数据包或者是本地输出的数据包，最后都会经过ip_output进行输出，函数设置设备和协议之后，经过NF_INET_POST_ROUTING钩子点，之后调用ip_finish_output进行后续输出操作，其中包括了分片等；
 
 ```c
 // net/ipv4/ip_output.c

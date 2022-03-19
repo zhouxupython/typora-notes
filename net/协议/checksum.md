@@ -2,6 +2,10 @@
 
 [原创                   Linux内核分析 - 网络[十三\]：校验和                       ](https://blog.csdn.net/qy532846454/article/details/7010852)
 
+[IP/TCP/UDP checsum](https://www.cnblogs.com/codestack/p/13633566.html)
+
+
+
 
 
 https://www.cnblogs.com/hpyu/p/14254250.html    Kernel调试追踪技术之 eBPF on ARM64

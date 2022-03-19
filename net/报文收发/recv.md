@@ -309,3 +309,40 @@ static inline int deliver_skb(struct sk_buff *skb,
 
 [原创                   Linux内核分析 - 网络[三\]：从netif_receive_skb()说起                       ](https://blog.csdn.net/qy532846454/article/details/6339789)
 
+
+
+[原创                   Linux-4.20.8内核桥收包源码解析（三）----------网卡驱动收包                       ](https://blog.csdn.net/Sophisticated_/article/details/87295513)
+
+[原创                   Linux-4.20.8内核桥收包源码解析（四）----------netif_receive_skb                       ](https://blog.csdn.net/Sophisticated_/article/details/87805798)
+
+[原创                   Linux-4.20.8内核桥收包源码解析（五）----------桥处理流程br_handle_frame                       ](https://blog.csdn.net/Sophisticated_/article/details/87878460)
+
+[原创                   Linux-4.20.8内核桥收包源码解析（六）----------决策函数br_handle_frame_finish                       ](https://blog.csdn.net/Sophisticated_/article/details/87922712)
+
+[原创                   Linux-4.20.8内核桥收包源码解析（七）----------本地（br_pass_frame_up）or 转发（br_forward）                       ](https://blog.csdn.net/Sophisticated_/article/details/87923362)
+
+
+
+[原创                   网络收包流程-报文从网卡驱动到网络层（或者网桥)的流程（非NAPI、NAPI）(一)                       ](https://blog.csdn.net/hzj_001/article/details/100085112)
+
+[原创                   网络收包流程-软中断中process_backlog和poll方式处理流程（二）                       ](https://blog.csdn.net/hzj_001/article/details/100708621)
+
+[原创                   网络收包流程-收包函数__netif_receive_skb的核心函数__netif_receive_skb_core（三）                       ](https://blog.csdn.net/hzj_001/article/details/104327771)
+
+[原创                   网路收包流程-网桥的处理流程（br网桥）（四）                       ](https://blog.csdn.net/hzj_001/article/details/104328321)
+
+[原创                   网路收报流程-网桥的处理流程（br网桥）（四）                       ](https://blog.csdn.net/hzj_001/article/details/104327900)
+
+[原创                   网络收包流程-网络层处理流程ip_rcv（五）                       ](https://blog.csdn.net/hzj_001/article/details/104950605)
+
+
+
+[设备收发包之netif_receive_skb](https://www.cnblogs.com/wanpengcoder/p/7577088.html)
+
+
+
+[原创                   网络丢包排查思路                       ](https://blog.csdn.net/hzj_001/article/details/104950713)
+
+[话说网卡收包内存的块](https://www.cnblogs.com/codestack/p/14278373.html)
+
+[ip_rcv 中使用skb_share_check](https://www.cnblogs.com/codestack/p/13441135.html)

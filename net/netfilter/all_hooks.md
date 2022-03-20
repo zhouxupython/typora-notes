@@ -1088,6 +1088,9 @@ tcp_transmit_skb
     	ip_queue_xmit
     		__ip_queue_xmit
     			ip_local_out
+    				__ip_local_out
+    					dst_output
+	    					ip_output
 
 
 
@@ -1468,7 +1471,7 @@ __netif_receive_skb_core
                                                 NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING, , ip_finish_output	
                                                     nf_hook
                                                     ip_finish_output
-                                                        BPF_CGROUP_RUN_PROG_INET_EGRESS   ？？？
+                                                        BPF_CGROUP_RUN_PROG_INET_EGRESS  // ？？？
                                                         __ip_finish_output
                                                             ip_finish_output2
                                                                 neigh_output
@@ -1477,6 +1480,19 @@ __netif_receive_skb_core
 #### 发包NF hooks链
 
 ```c
+// 路径
+tcp_transmit_skb
+    __tcp_transmit_skb
+    	ip_queue_xmit
+    		__ip_queue_xmit
+    			ip_local_out
+    				__ip_local_out				// NF_INET_LOCAL_OUT
+                    dst_output
+                    	ip_output			// NF_INET_POST_ROUTING
+
+
+
+// 调用链
 ip_local_out
     __ip_local_out
         nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT,			// NF_INET_LOCAL_OUT
@@ -1490,5 +1506,17 @@ ip_local_out
                     __ip_finish_output
                         ip_finish_output2
                             neigh_output
+                         		neigh_hh_output
+                         			dev_queue_xmit
+                         				__dev_queue_xmit
+                                            sch_handle_egress                     // 【tc egress】
+                                                tcf_classify                       // 执行tc egress 钩子函数
+                                            __dev_xmit_skb
+                                                sch_direct_xmit
+                                                    dev_hard_start_xmit
+                                                        xmit_one
+                                                            dev_queue_xmit_nit    // 【tcpdump】
+                                                                skb2 = skb_clone
+                                                                pt_prev->func(skb2
 ```
 

@@ -14,7 +14,9 @@
 
 [sk_buff结构--转载](https://www.cnblogs.com/codestack/p/11853392.html)
 
+https://xingkunz.github.io/tags/网络
 
+https://jiyang.site/posts/2020-01-02-理解linux内部网络实现之关键数据结构之-sk_buff/
 
 
 

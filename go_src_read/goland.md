@@ -1,4 +1,10 @@
-## 1.cidr-tool单元测试运行设置
+## 1. proxy
+
+```Go
+go env -w GOPROXY=https://goproxy.cn
+```
+
+## 2. cidr-tool单元测试运行设置
 
 zhouxu@zhouxu:~/ go get github.com/amianetworks/cidr-tool
 zhouxu@zhouxu:~/works/dcube-comment/cidr-tool$ go mod init cidr-tool

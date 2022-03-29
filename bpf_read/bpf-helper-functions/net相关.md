@@ -14,7 +14,7 @@ bpf_skb_store_bytes
     return bpf_redirect(p_conn->ifindex, 0);
 
 ---------------------------------------------------------------------------
-### bpf_skb_store_bytes
+## bpf_skb_store_bytes
 
 802.3 ETH2帧格式
 
@@ -26,28 +26,20 @@ dst_mac | src_mac | len |.....
 ![img](mac协议头.png)
 
 
-long bpf_skb_store_bytes(struct sk_buff *skb, u32 offset, const
-void *from, u32 len, u64 flags)
 
-  Description
-         Store len bytes from address from into the packet
-         associated to skb, at offset. flags are a
-         combination of BPF_F_RECOMPUTE_CSUM (automatically
-         recompute the checksum for the packet after storing
-         the bytes) and BPF_F_INVALIDATE_HASH (set
-         skb->hash, skb->swhash and skb->l4hash to 0).
+签名： 		int bpf_skb_store_bytes(struct sk_buff *skb, u32 offset, const void *from, u32 len, u64 flags)
 
-​         A call to this helper is susceptible to change the
-​         underlying packet buffer. Therefore, at load time,
-​         all checks on pointers previously done by the
-​         verifier are invalidated and must be performed
-​         again, if the helper is used in combination with
-​         direct packet access.
+将从from开始的len个字节，拷贝到 ==skb->data== + offset 处。从skb->data开始计算偏移，不是从skb开始。
 
-  Return 0 on success, or a negative error in case of
-         failure.
+flags是以下位域的组合：
+
+1. BPF_F_RECOMPUTE_CSUM：自动重新计算修改后的封包的Checksum
+2. BPF_F_INVALIDATE_HASH：重置 skb->hash、skb->swhash、skb->l4hash为0
+
+调用此助手函数会导致封包缓冲区改变，因此在加载期间校验器对指针的校验将失效，必须重新校验。
 
 ```c
+// linux-5.14.14/net/core/filter.c
 BPF_CALL_5(bpf_skb_store_bytes, struct sk_buff *, skb, u32, offset,
 	   const void *, from, u32, len, u64, flags) // 将从from开始的len个字节，拷贝到 skb->data + offset 处
 {
@@ -78,7 +70,7 @@ struct sk_buff {
 	sk_buff_data_t		tail;
 	sk_buff_data_t		end;
 	unsigned char		*head,
-				        *data; //
+				        *data; //   将从from开始的len个字节，拷贝到 skb->data + offset 处
 ```
 
 
@@ -87,6 +79,9 @@ struct sk_buff {
 https://www.cxymm.net/article/qq_17045267/103764320  
 
 ```c
+// int bpf_skb_store_bytes(struct sk_buff *skb, u32 offset, const void *from, u32 len, u64 flags)
+#define ETH_ALEN	6		/* Octets in one ethernet addr	 */
+
 /* 交换报文的mac源和目的地址 */
 bpf_skb_store_bytes(skb, offsetof(struct ethhdr, h_source), dst_mac, ETH_ALEN, 0);
 bpf_skb_store_bytes(skb, offsetof(struct ethhdr, h_dest), src_mac, ETH_ALEN, 0);
@@ -95,18 +90,111 @@ bpf_skb_store_bytes(skb, offsetof(struct ethhdr, h_dest), src_mac, ETH_ALEN, 0);
 bpf_skb_store_bytes(skb, IP_SRC_OFF, &dst_ip, sizeof(dst_ip), 0);
 bpf_skb_store_bytes(skb, IP_DST_OFF, &src_ip, sizeof(src_ip), 0);
 
-/*
- * 将ICMP报文的类型修改为回显类型，并重新计算校验码
- */
+// 将ICMP报文的类型修改为回显类型，并重新计算校验码
 __u8 new_type = 0;
 bpf_l4_csum_replace(skb, ICMP_CSUM_OFF, ICMP_PING, new_type, ICMP_CSUM_SIZE);
 bpf_skb_store_bytes(skb, ICMP_TYPE_OFF, &new_type, sizeof(new_type), 0);
 ```
 
+------
+
+## bpf_skb_load_bytes
+
+签名： 		int bpf_skb_load_bytes(const struct sk_buff *skb, u32 offset, void *to, u32 len)
+
+从skb->data + offset 位置读取len长的数据，存放到to缓冲区。
+
+从4.7开始，该函数的功能基本被直接封包访问（direct packet access）代替，skb->data 和 skb->data_end给出了封包数据的位置。
+
+如果希望一次性读取大量数据到eBPF，仍然可以使用该函数。
+
+```c
+// linux-5.14.14/net/core/filter.c
+BPF_CALL_4(bpf_skb_load_bytes, const struct sk_buff *, skb, u32, offset, void *, to, u32, len)
+{
+	void *ptr;
+
+	if (unlikely(offset > 0xffff))
+		goto err_clear;
+
+	ptr = skb_header_pointer(skb, offset, len, to);// 从skb->data开始计算偏移，不是从skb开始
+	if (unlikely(!ptr))
+		goto err_clear;
+	if (ptr != to)
+		memcpy(to, ptr, len);
+
+	return 0;
+err_clear:
+	memset(to, 0, len);
+	return -EFAULT;
+}
+
+// linux-5.14.14/include/linux/skbuff.h
+static inline void * __must_check
+__skb_header_pointer(const struct sk_buff *skb, int offset, int len,
+		     const void *data, int hlen, void *buffer)
+{
+    // 在当前页的数据大小 - offset = 偏移后当前页还有多少数据，若大于需要拷贝的长度len，那么需要拷贝的数据都在当前页中
+	if (likely(hlen - offset >= len))
+		return (void *)data + offset;
+
+	/*if (!skb || unlikely(skb_copy_bits(skb, offset, buffer, len) < 0))
+		return NULL;*/    // zx注释掉的
+
+	return buffer;
+}
+
+// skb->len是数据包长度，在IPv4中就是单个完整IP包的总长，但这些数据并不一定都在当前内存页，可能跨页存储
+// skb->data_len表示在其他页的数据长度（包括本skb在其他页中的数据以及分片skb中的数据）
+static inline unsigned int skb_headlen(const struct sk_buff *skb)
+{
+	return skb->len - skb->data_len;// 表示在当前页的数据大小，skb->data_len可能为0（线性），可能不为0（非线性）
+}
+
+// http://blog.chinaunix.net/uid-22227409-id-2656918.html	关于skb_header_pointer函数
+// 先判断要拷贝的数据是否都在当前页面内，如果是，则可以直接对数据处理，返回所求数据指针；
+// 否则用skb_copy_bits()函数进行拷贝
+static inline void * __must_check
+skb_header_pointer(const struct sk_buff *skb, int offset, int len, void *buffer)// 就是 data + offset
+{
+	return __skb_header_pointer(skb, offset, len, skb->data,
+				    skb_headlen(skb), buffer);
+}
+
+// 如果skb->data_len不为0，表示该IP包的数据分属不同的页，该数据包也就被成为非线性化的，一般刚进行完碎片重组的skb包就属于非线性化的
+static inline bool skb_is_nonlinear(const struct sk_buff *skb)
+{
+	return skb->data_len;
+}
+```
+
+
+
+```c
+// int bpf_skb_load_bytes(const struct sk_buff *skb, u32 offset, void *to, u32 len)
+static __always_inline __u32 tcp_load(struct __ctx_buf *ctx,  __u64 offset, ipv4_tuple_s *tuple, ipv4_extra_s *extra) {
+    ......
+#ifdef CFG_PROG_TYPE_TC
+    // 从ctx->data + offset 位置读取sizeof(struct tcphdr)长的数据，存放到hdr_tcp缓冲区。
+    ret = bpf_skb_load_bytes(ctx, offset, &hdr_tcp, sizeof(struct tcphdr));
+    if (ret < 0) {
+        TRACE_LOG(TRACE_LOG_ERROR, PARSE_LOG_PREFIX"failed to load tcp %d\n", ret); 
+        return BPFM_ERR;
+    }
+    
+    tuple->src_port = hdr_tcp.source; 
+    tuple->dst_port = hdr_tcp.dest; 
+    extra->tcp.flags = hdr_tcp.flags;
+    extra->tcp.seq_n = hdr_tcp.seq;
+    extra->tcp.ack_n = hdr_tcp.ack_seq;
+    return BPFM_OK;
+```
+
+
 
 ------
 
-### 校检和checksum
+## 校检和checksum
 
 bpf_csum_diff
 bpf_l3_csum_replace

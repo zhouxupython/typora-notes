@@ -148,7 +148,7 @@ __skb_header_pointer(const struct sk_buff *skb, int offset, int len,
 // skb->data_len表示在其他页的数据长度（包括本skb在其他页中的数据以及分片skb中的数据）
 static inline unsigned int skb_headlen(const struct sk_buff *skb)
 {
-	return skb->len - skb->data_len;// 表示在当前页的数据大小，skb->data_len可能为0（线性），可能不为0（非线性）
+	return skb->len - skb->data_len;// 返回值 表示在当前页的数据大小，skb->data_len可能为0（线性），可能不为0（非线性）
 }
 
 // http://blog.chinaunix.net/uid-22227409-id-2656918.html	关于skb_header_pointer函数

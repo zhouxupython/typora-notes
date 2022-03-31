@@ -513,20 +513,30 @@ struct list_head ptype_all __read_mostly;	/* Taps */
 
 // include/linux/netdevice.h
 struct packet_type {
-	__be16			type;/* This is really htons(ether_type). 协议标识符，func会使用，保存了三层协议类型，ETH_P_IP、ETH_P_ARP等等*/
+    // 标识以太网帧或其他链路层报文承载网络层报文的协议号, 协议标识符，func会使用，保存了三层协议类型，ETH_P_IP、ETH_P_ARP等等
+	__be16			type;/* This is really htons(ether_type). */
+    
 	bool			ignore_outgoing;
-	struct net_device	*dev;	/* NULL is wildcarded here	  NULL指针表示该处理程序对系统中所有网络设备都有效   */
+    
+    // NULL is wildcarded here 接收从指定网络设备输入的数据包，
+    // 如果为NULL表示接收来自全部网络设备的数据包,该处理程序对系统中所有网络设备都有效
+	struct net_device	*dev; 
+    
+    // 协议入口接收处理函数。
+    // 第一个参数为待输入的报文，第二个参数为当前处理该报文的网络设备，第三个参数为报文类型，第四个参数为报文的原始输入网络设备。
+    // 指向网络层函数的指针，如果分组的类型适当，将其传递给该函数。其中可能的处理程序就是三层的ip报文接收函数，ip_rcv
 	int			(*func) (struct sk_buff *, 
-					 struct net_device *,
+					 struct net_device *,	// 当前处理该报文的网络设备
 					 struct packet_type *,
-					 struct net_device *); // 指向网络层函数的指针，如果分组的类型适当，将其传递给该函数。其中可能的处理程序就是ip_rcv
+					 struct net_device *);  // 报文的原始输入网络设备
+    
 	void			(*list_func) (struct list_head *,
 					      struct packet_type *,
 					      struct net_device *);
 	bool			(*id_match)(struct packet_type *ptype,
 					    struct sock *sk);
-	void			*af_packet_priv;
-	struct list_head	list;
+	void			*af_packet_priv; // 用来存储各协议族的私有数据
+	struct list_head	list; // 连接不同协议族报文接收例程的链表
 };
 
 
@@ -584,8 +594,8 @@ static int __init inet_init(void)
 }
 
 // net/core/dev.c
-struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
-struct list_head ptype_all __read_mostly;	/* Taps */
+struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly; // 包括了 ip_packet_type
+struct list_head ptype_all __read_mostly;	/* Taps */	// 抓包
 /*
  *	Add a protocol ID to the list. Now that the input handler is
  *	smarter we can dispense with all the messy stuff that used to be

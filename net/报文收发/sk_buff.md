@@ -87,6 +87,8 @@ void kfree_skb(struct sk_buff *skb)
 
 ------
 
+## 四个常用函数
+
 ==skb分配好之后，head、end两个指针不变了，下面的操作都是data、tail两个指针在变化，表示user data区间的变化==
 
 ```c
@@ -98,6 +100,8 @@ void kfree_skb(struct sk_buff *skb)
  *	This function extends the used data area of the buffer. If this would
  *	exceed the total buffer size the kernel will panic. A pointer to the
  *	first byte of the extra data is returned. 返回的是扩展之前的tail位置，即增加的区域的起始位置
+ 
+ 开始存储数据时，通过调用函数skb_put()来使tail指针向下移动空出空间来添加数据，此时skb->data和skb->tail之间存放的都是数据信息，无协议信息。
  */
 void *skb_put(struct sk_buff *skb, unsigned int len)
 {
@@ -165,6 +169,7 @@ static inline void *__skb_pull(struct sk_buff *skb, unsigned int len)
  *
  *	Increase the headroom of an empty &sk_buff by reducing the tail
  *	room. This is only allowed for an empty buffer.
+ 开始准备存储应用层下发过来的数据，通过调用函数 skb_reserve()来使data指针和tail指针同时向下移动，空出一部分空间来为后期添加协议信息。
  */
 static inline void skb_reserve(struct sk_buff *skb, int len)
 {
@@ -175,15 +180,15 @@ static inline void skb_reserve(struct sk_buff *skb, int len)
 
 ![](D:\10000_works\zzztmp\截图\sk_buff_2.6.20_put_push_pull_reserve.png)
 
-reserve：
+**reserve**：
 
 开始准备存储应用层下发过来的数据，通过调用函数 skb_reserve()来使data指针和tail指针同时向下移动，空出一部分空间来为后期添加==协议==信息。
 
-put：
+**put**：
 
 开始存储数据时，通过调用函数skb_put()来使tail指针向下移动空出空间来添加数据，此时skb->data和skb->tail之间存放的都是==数据==信息，无协议信息。
 
-push、pull处理各层协议头的：
+**push**、**pull**处理各层协议头的：
 
 push是高层协议到低层协议，通常用于发送的数据包后在各层由上往下传递时，添加下层的协议首部；这时就开始调用函数skb_push()来使data指针向上移动，空出空间来添加各层==协议==信息。直到最后到达二层，添加完帧头然后就开始发包了。
 
@@ -193,15 +198,7 @@ pull是低层协议到高层协议，通常用于接收的数据包后在各层�
 
 ------
 
-```c
-/*
-克隆sk_buff
-只复制sk_buff描述符，同时增加数据缓存区的引用计数
-*/
-skb_clone
-```
 
-![](D:\10000_works\zzztmp\截图\skb_clone.png)
 
 ```c
 /*
@@ -217,57 +214,241 @@ skb_copy
 
 ------
 
+## skb_add_data
+
 ```c
 /*
 添加尾部数据
 将指定用户空间的数据添加到skb_buff的数据缓存区的尾部
 */
-skb_add_data
+// skb为被添加的sk_buff类型的结构体，from为将要添加的数据源，copy为数据源的长度
+static inline int skb_add_data(struct sk_buff *skb,
+			       char __user *from, int copy)
+{
+	const int off = skb->len;
+ 	// skb_put返回的是 增加的区域的起始位置，这是拷贝目的地
+	if (skb->ip_summed == CHECKSUM_NONE) {// 表示检验ip包的校验
+		int err = 0;
+// 数据拷贝操作，这里调用了skb_put()函数让tail往下移空出控件来存放将要拷贝的数据，并且返回tail指针
+		__wsum csum = csum_and_copy_from_user(from, skb_put(skb, copy), 
+							    copy, 0, &err); 
+		if (!err) {
+			skb->csum = csum_block_add(skb->csum, csum, off); // 这个应该是IP校验计算吧
+			return 0;
+		}
+	} else if (!copy_from_user(skb_put(skb, copy), from, copy)) // 这是最本质的数据拷贝操作宏，同样调用了skb_put()函数返回tail指针
+		return 0;
+ 
+	__skb_trim(skb, off); // 这个是删除数据操作，将在下一个数据删除（skb_trim()函数）分析
+	return -EFAULT;
+}
+ 
+static inline
+__wsum csum_and_copy_from_user (const void __user *src, void *dst,
+				      int len, __wsum sum, int *err_ptr)
+{
+	if (access_ok(VERIFY_READ, src, len)) // 判断数据长度关系
+		return csum_partial_copy_from_user(src, dst, len, sum, err_ptr); // 调用拷贝函数
+ 
+	if (len)
+		*err_ptr = -EFAULT;
+	return sum;
+}
+ 
+static __inline__
+__wsum csum_partial_copy_from_user(const void __user *src,
+                                         void *dst, int len, __wsum sum,
+                                         int *err_ptr)
+{
+        if (copy_from_user(dst, src, len)) { // 拷贝操作
+                *err_ptr = -EFAULT;
+                return (__force __wsum)-1;
+        }
+        return csum_partial(dst, len, sum); // 设置校验和
+}
+ 
+// 这是调用memcpy()函数来对数据进行拷贝，to是tail指针，from是将要插入的数据源指针，n是数据源长度
+#define copy_from_user(to, from, n)	(memcpy((to), (from), (n)), 0) 
 ```
 
 ![](D:\10000_works\zzztmp\截图\skb_add_data.png)
+
+------
+
+## skb_trim
 
 ```c
 /*
 删除尾部数据：skb_trim()
 与skb_add_data()操作相反
 */
+// 这里值得注意的是len不是要删除的数据长度，而是删除后的数据长度，即是新的数据长度。
+// 所以新的数据长度不能比开始的skb的长度还大，否则就是插入增加数据函数而不是删除数据函数了
+void skb_trim(struct sk_buff *skb, unsigned int len)
+{	
+	if (skb->len > len) 
+		__skb_trim(skb, len);// 调用函数进行删除数据操作
+}
+ 
+static inline void __skb_trim(struct sk_buff *skb, unsigned int len)
+{
+	if (unlikely(skb->data_len)) {
+		WARN_ON(1);
+		return;
+	}
+	skb->len = len; // 为新的skb赋上删除后的len值
+	skb_set_tail_pointer(skb, len); // 调用函数删除操作
+}
+ 
+static inline void skb_set_tail_pointer(struct sk_buff *skb, const int offset)
+{
+	skb->tail = skb->data + offset; // 实质上没有对数据进行删除，只是让tail指针偏移，改变有效数据值的范围
+}
 ```
 
 ![](D:\10000_works\zzztmp\截图\skb_trim.png)
 
 ------
 
+## pskb_trim
+
+删除sk_buff结构中分片结构的数据区数据函数：
+
+pskb_trim()函数其实包含了skb_trim()函数，如果当分片结构数据区没有数据则skb_trim()函数和pskb_trim()函数是一样的。
+
+如果分片结构数据区有数据时，则pskb_trim()函数不仅要删除sk_buff结构数据区数据（skb_trim()函数功能），还要删除分片结构数据区数据。
+
+```c
+static inline int pskb_trim(struct sk_buff *skb, unsigned int len)
+{
+	return (len < skb->len) ? __pskb_trim(skb, len) : 0; // 这个功能和上面类似，如果新len值小于skb原有的值，则做删除操作
+}
+static inline int __pskb_trim(struct sk_buff *skb, unsigned int len)
+{
+	if (skb->data_len)// 如果分片结构数据区有数据
+		return ___pskb_trim(skb, len);// 则调用该函数来删除分片结构中的数据区数据，三个下划线开头，不是递归调用
+	__skb_trim(skb, len);// 这个和上面删除sk_buff结构中的数据区数据一样
+	return 0;
+}
+```
+
+
+
+------
+
+## skb_split
+
 ```c
 /*
 拆分数据：skb_split()
 根据指定长度拆分sk_buff，使得原sk_buff中的数据长度为指定长度，剩下的数据保存到拆分得到的sk_buff中
-LEN：拆分长度，hlen：线性数据长度 + 当拆分数据的长度小于线性数据长度时，直接拆分线性数据区即可
 
-
-拆分数据的长度大于线性数据长度时，则需要拆分非线性区域中的数据，拆分长度LEN大于hlen并且LEN小于hlen+S1
-*/
-
-
-/*
-拆分数据：skb_split()
-根据指定长度拆分sk_buff，使得原sk_buff中的数据长度为指定长度，剩下的数据保存到拆分得到的sk_buff中
-指向984zx
 LEN：拆分长度；hlen：线性数据长度
 （1）当拆分数据的长度小于线性数据长度时，直接拆分线性数据区即可
 （2）拆分数据的长度大于线性数据长度时，则需要拆分非线性区域中的数据，拆分长度LEN大于hlen并且LEN小于hlen+S1
 */
+// skb为原来的skb结构体（将要被拆分的），skb1为拆分后得到的子skb，len为拆分后的skb的新长度
+void skb_split(struct sk_buff *skb, struct sk_buff *skb1, const u32 len)
+{
+	int pos = skb_headlen(skb);// pos = skb->len - skb->data_len，pos是skb数据区长度
+ 
+	if (len < pos)	// （1）如果拆分长度小于skb数据区中的有效长度，则调用下面函数
+		skb_split_inside_header(skb, skb1, len, pos);// 该函数只拆分skb数据区中的数据
+	else  // （2）反之，如果拆分长度不小于skb数据区中的有效长度，则调用下面函数
+		skb_split_no_header(skb, skb1, len, pos);// 拆分skb结构中的分片结构中数据区数据
+}
+ 
+// 这是只拆分sk_buff结构数据区的数据，其他参数不变，参数：pos则是sk_buff结构数据区中有效数据长度
+static inline void skb_split_inside_header(struct sk_buff *skb,
+					   struct sk_buff* skb1,
+					   const u32 len, const int pos)
+{
+	int i;
+	// 这是个把sk_buff结构中有效数据拷贝到新的skb1中,pos为有效数据长度，len为剩下数据长度，得：pos-len为要拷贝的数据长度
+        // skb_put(skb1,pos-len)是移动tail指针让skb1结构数据区空出空间来存放将要拷贝的数据，该函数返回tail指针
+	skb_copy_from_linear_data_offset(skb, len, skb_put(skb1, pos - len),
+					 pos - len);
+        /*
+		为了方便理解，把该函数实现代码注释进来
+        skb为要被拆分的sk_buff结构，offset为剩下新的skb数据长度，to为skb1结构中tail指针，len为要拷贝的数据长度
+        static inline void skb_copy_from_linear_data_offset(const struct sk_buff *skb,
+	    			    const int offset, void *to,
+	    			    const unsigned int len)
+	    {
+			// 从skb要剩下的数据位置开始（即是skb->data+offset，skb->data和skb->data+offset之间的数据是要保留的）
+            // to则是tail指针移动前返回的一个位置指针（详细请看skb_put()函数实现），拷贝len长度内容
+			memcpy(to, skb->data + offset, len);
+	    }
+        如果对sk_buff结构及相关结构体中成员变量了解，则这些代码就非常好理解了。
+        
+		*/
+    
+    // nr_frags为多少个分片数据区，循环把所有分片数据拷贝到skb1中
+	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+		skb_shinfo(skb1)->frags[i] = skb_shinfo(skb)->frags[i];
+	
+	//下面做的都是些成员字段拷贝赋值操作，并且设置skb的字段
+	skb_shinfo(skb1)->nr_frags = skb_shinfo(skb)->nr_frags;
+	skb_shinfo(skb)->nr_frags  = 0;
+	skb1->data_len		   = skb->data_len;
+	skb1->len		   += skb1->data_len;
+	skb->data_len		   = 0;
+	skb->len		   = len;
+	skb_set_tail_pointer(skb, len);// 下面把实现函数代码注释进来，方便理解	
+ 		//	static inline void skb_set_tail_pointer(struct sk_buff *skb, const int offset)
+		//	{
+		//		// 这是把tail指针移到数据区的最后面
+		//		skb->tail = skb->data + offset;	
+		//	}
+}
+
+// 这是拆分分片结构数据区数据，同理，其他参数不变，参数：pos则是sk_buff结构数据区中有效数据长度
+static inline void skb_split_no_header(struct sk_buff *skb,
+				       struct sk_buff* skb1,
+				       const u32 len, int pos)
+{
+	int i, k = 0;
+	// 开始设置sk_buff结构数据区内容
+	const int nfrags = skb_shinfo(skb)->nr_frags;
+	skb_shinfo(skb)->nr_frags = 0;
+	skb1->len		  = skb1->data_len = skb->len - len;
+	skb->len		  = len;
+	skb->data_len		  = len - pos;
+	
+	// 这是循环拆分分片结构数据区数据
+	for (i = 0; i < nfrags; i++) {
+		int size = skb_shinfo(skb)->frags[i].size;
+	// 其实拆分，数据区存储不会动，动的只是指向这些数据存储的位置指针
+       //  下面都是把skb的一些指向分片结构数据区的指针赋值给skb1中的数据区相关变量
+		if (pos + size > len) {
+			skb_shinfo(skb1)->frags[k] = skb_shinfo(skb)->frags[i];
+			if (pos < len) {
+				get_page(skb_shinfo(skb)->frags[i].page);
+				skb_shinfo(skb1)->frags[0].page_offset += len - pos;
+				skb_shinfo(skb1)->frags[0].size -= len - pos;
+				skb_shinfo(skb)->frags[i].size	= len - pos;
+				skb_shinfo(skb)->nr_frags++;
+			}
+			k++;
+		} else
+			skb_shinfo(skb)->nr_frags++;
+		pos += size;
+	}
+	skb_shinfo(skb1)->nr_frags = k;
+}
 ```
+
+（1）当拆分数据的长度小于线性数据长度时，直接拆分线性数据区即可
 
 ![](D:\10000_works\zzztmp\截图\skb_split-直接拆分.jpg) 
 
+（2）拆分数据的长度大于线性数据长度时，则需要拆分非线性区域中的数据，拆分长度LEN大于hlen并且LEN小于hlen+S1
 
+所以需要从S1中取一部分补上，S1剩余 S1-(LEN-hlen)
 
 ![](D:\10000_works\zzztmp\截图\skb_split-拆分非线性区域.jpg)
 
 ------
-
-
 
 ## skb_shared_info
 
@@ -355,6 +536,16 @@ struct bio_vec {
 
 
 ## alloc_skb
+
+size是sk_buff数据区长度。
+
+分配好之后，申请的内存包括：
+
+sk_buff结构体一个（或者sk_buff_fclones）、
+
+size大小的sk_buff数据区、
+
+skb_shared_info分片结构体一个，不包括分片数据区
 
 ```c
 /**
@@ -551,6 +742,398 @@ if (fclone) {
 
 }
 ```
+
+
+
+-  skb_clone函数仅仅是克隆个sk_buff结构体，其他数据都是共享；
+
+-  pskb_copy函数克隆复制了sk_buff和其数据区(包括分片结构体)，其他数据共享；
+
+-  skb_copy函数则是完全的复制拷贝函数了，把sk_buff结构体和其数据区（包括分片结构体）、分片结构的数据区都复制拷贝了一份。
+
+    
+
+### skb_clone
+
+```c
+enum {
+	SKB_FCLONE_UNAVAILABLE,	/* skb has no fclone (from head_cache) */
+	SKB_FCLONE_ORIG,	/* orig skb (from fclone_cache) */
+	SKB_FCLONE_CLONE,	/* companion fclone skb (from fclone_cache) */
+};
+
+/**
+ *	skb_clone	-	duplicate an sk_buff
+ *	@skb: buffer to clone
+ *	@gfp_mask: allocation priority
+ *
+ *	Duplicate an &sk_buff. The new one is not owned by a socket. Both
+ *	copies share the same packet data but not structure. The new
+ *	buffer has a reference count of 1. If the allocation fails the
+ *	function returns %NULL otherwise the new buffer is returned.
+ *
+ *	If this function is called from an interrupt gfp_mask() must be
+ *	%GFP_ATOMIC.
+ */
+/*
+skb->fclone 这个值：
+在 __alloc_skb 函数中，一开始使用 memset(skb, 0, offsetof(struct sk_buff, tail)); 将其置为0（SKB_FCLONE_UNAVAILABLE）；
+然后判断flags是否有 SKB_ALLOC_FCLONE 置位，如果有，那么skb->fclone = SKB_FCLONE_ORIG; 并且 fclones->skb2.fclone = SKB_FCLONE_CLONE;
+*/
+
+/*  整体看__alloc_skb 函数中，clone方面的代码
+	cache = (flags & SKB_ALLOC_FCLONE)
+		? skbuff_fclone_cache : skbuff_head_cache;// skbuff_fclone_cache
+		
+	skb = kmem_cache_alloc_node(cache, gfp_mask & ~GFP_DMA, node);// 所以此时是两个skb结构体返回，其实申请的是sk_buff_fclones
+																  // 返回了第一个skb位置
+	if (flags & SKB_ALLOC_FCLONE) {
+		struct sk_buff_fclones *fclones;
+
+		fclones = container_of(skb, struct sk_buff_fclones, skb1);// 所以才能执行这样的操作，要是非clone，不会有两个skb
+																  // 返回这个skb所属的sk_buff_fclones
+		skb->fclone = SKB_FCLONE_ORIG;// 值为1
+		refcount_set(&fclones->fclone_ref, 1);// ref为1，表示没有被clone过
+
+		fclones->skb2.fclone = SKB_FCLONE_CLONE;// 值为2
+	}
+*/
+struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
+{
+	struct sk_buff_fclones *fclones = container_of(skb,
+						       struct sk_buff_fclones,
+						       skb1);
+	struct sk_buff *n;
+
+	if (skb_orphan_frags(skb, gfp_mask))
+		return NULL;
+
+	if (skb->fclone == SKB_FCLONE_ORIG &&//说明__alloc_skb 中，flags有 SKB_ALLOC_FCLONE 置位
+	    refcount_read(&fclones->fclone_ref) == 1) {//上面代码也有这个
+		n = &fclones->skb2;// 因为本身是SKB_ALLOC_FCLONE，所以__alloc_skb中，分配了两个skb，n指向第二个
+		refcount_set(&fclones->fclone_ref, 2);// ref为2，表示clone了
+	} else {// __alloc_skb只分配了一个skb，这里需要再分配一个
+		if (skb_pfmemalloc(skb))
+			gfp_mask |= __GFP_MEMALLOC;
+		
+        // 因为还不能确定这个skb(即clone出来的这个)是否还会被克隆，所以到skbuff_head_cache缓存池上去申请；
+        // 同时设置其clone标志为0（SKB_FCLONE_UNAVAILABLE）
+		n = kmem_cache_alloc(skbuff_head_cache, gfp_mask);
+		if (!n)
+			return NULL;
+
+		n->fclone = SKB_FCLONE_UNAVAILABLE;
+	}
+	// skb_clone()函数实现的仅仅是克隆一个skb内存空间，而一些数据拷贝复制则是用_skb_clone()函数来完成。
+    // 所以 __skb_clone() 函数主要是实现从skb中把相关成员字段拷贝到n中去
+	return __skb_clone(n, skb);
+}
+
+/*
+ * You should not add any new code to this function.  Add it to
+ * __copy_skb_header above instead.
+ */
+static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
+{
+#define C(x) n->x = skb->x	// @@@ C(x)作用域开始
+
+	n->next = n->prev = NULL;
+	n->sk = NULL;
+	__copy_skb_header(n, skb);
+
+	C(len);
+	C(data_len);
+	C(mac_len);
+	n->hdr_len = skb->nohdr ? skb_headroom(skb) : skb->hdr_len;
+	n->cloned = 1;
+	n->nohdr = 0;
+	n->peeked = 0;
+	C(pfmemalloc);
+	C(pp_recycle);
+	n->destructor = NULL;
+	C(tail);
+	C(end);
+	C(head);
+	C(head_frag);
+	C(data);
+	C(truesize);
+	refcount_set(&n->users, 1);//设置n的引用计数为1，表明还有另外一个skb（其实就是父skb），防止n释放时连同共享数据区一起释放(因为父skb还在)。
+	
+    /* 
+    __build_skb_around 中，已经将shinfo->dataref设置为1，所以clone后，ref需要增加，表示两个位置的skb在引用这个分片结构体。    
+    这个简单的说就是，因为开始也讲过sk_buff的数据区和分片结构是一体的，连内存申请和释放都是一起的。
+    而dataref是分片结构skb_shared_info中的一个 表示sk_buff的数据区和分片结构被多少skb共享的 成员字段。
+    这里调用atomic_inc()函数让该引用计数器自增，表明克隆skb对sk_buff数据区和分片结构的共享引用。*/
+	atomic_inc(&(skb_shinfo(skb)->dataref));
+	skb->cloned = 1;//表明这是个克隆的skb结构体。
+
+	return n;
+#undef C					// @@@  C(x)作用域结束
+}
+```
+
+skb_clone()函数的效果图
+
+![](D:\10000_works\zzztmp\截图\skb_clone.png)
+
+![skb_clone2](D:\10000_works\zzztmp\截图\skb_clone2.png)
+
+其实上面的方法：由skb_clone()函数克隆一个skb，然后共享其他数据。虽然可以提高效率，但是存在一个很大的==缺陷==：
+
+就是当有克隆skb指向共享数据区（skb数据区、分片结构和分片数据区）时，那么共享数据区的数据就不能被修改了。
+
+所以说如果只是让多个skb查看共享数据区内容，则可以用skb_clone()函数来克隆这几个skb出来，提高效率。
+
+但如果涉及到某个skb要修改sk_buff结构的数据区，则必须要用下面这几个函数来克隆拷贝出skb。
+
+
+### pskb_copy
+
+```c
+static inline struct sk_buff *pskb_copy(struct sk_buff *skb,
+					gfp_t gfp_mask)
+{
+	return __pskb_copy(skb, skb_headroom(skb), gfp_mask);// headroom: skb->data - skb->head;
+}
+
+static inline struct sk_buff *__pskb_copy(struct sk_buff *skb, int headroom,
+					  gfp_t gfp_mask)
+{
+	return __pskb_copy_fclone(skb, headroom, gfp_mask, false);
+}
+
+
+/**
+ *	__pskb_copy_fclone	-  create copy of an sk_buff with private head.
+ *	@skb: buffer to copy
+ *	@headroom: headroom of new skb
+ *	@gfp_mask: allocation priority
+ *	@fclone: if true allocate the copy of the skb from the fclone
+ *	cache instead of the head cache; it is recommended to set this
+ *	to true for the cases where the copy will likely be cloned
+ *
+ *	Make a copy of both an &sk_buff and part of its data, located
+ *	in header. Fragmented data remain shared. This is used when
+ *	the caller wishes to modify only header of &sk_buff and needs
+ *	private copy of the header to alter. Returns %NULL on failure
+ *	or the pointer to the buffer on success.
+ *	The returned buffer has a reference count of 1.
+ */
+
+struct sk_buff *__pskb_copy_fclone(struct sk_buff *skb, int headroom,
+				   gfp_t gfp_mask, bool fclone)
+{
+    // headlen: len - data_len; 另  len = (tail - data) + data_len  所以headlen=tail - data
+    // headlen + headroom = tail - data + data - head = tail - head
+	unsigned int size = skb_headlen(skb) + headroom;// tail - head
+	int flags = skb_alloc_rx_flag(skb) | (fclone ? SKB_ALLOC_FCLONE : 0);
+	struct sk_buff *n = __alloc_skb(size, gfp_mask, flags, NUMA_NO_NODE); // n包括了sk_buff结构体一个（或者sk_buff_fclones）、size大小的sk_buff数据区、skb_shared_info分片结构体一个，不包括分片数据区(正好这个函数不clone分片数据区，共享)
+
+	if (!n)
+		goto out;
+
+	/* Set the data pointer */
+	skb_reserve(n, headroom);// headroom: skb->data - skb->head;
+	/* Set the tail pointer and length */
+	skb_put(n, skb_headlen(skb));// headlen: len - data_len
+	/* Copy the bytes 
+	这是个内存拷贝的封装函数，就是从被拷贝的skb结构中的data指针指向的地方开始，
+	偏移len  （因为len = (data - tail) + data_len；所以这里本应该写成(data - tail)的，但考虑到此时分片结构数据区还没有数据，data_len为零。
+	即是len = data-tail）    个字节内容都拷贝到新复制到的skb结构体中去。
+	即是：用被拷贝的skb中的数据区内容来为新拷贝的skb结构的数据区填充。
+	
+	因为这一步不考虑分片区域，所以就将skb的sk_buff数据区数据拷贝到n的sk_buff数据区；
+	本来这个区域长度是 n->len - n->data_len，因为这一步data_len为零，所以就是n->len
+	*/    
+	skb_copy_from_linear_data(skb, n->data, n->len);// memcpy(n->data, skb->data, n->len);
+
+	n->truesize += skb->data_len;
+	n->data_len  = skb->data_len;
+	n->len	     = skb->len;
+
+	if (skb_shinfo(skb)->nr_frags) {// 分片个数， 这里是数组形式组织的分片的拷贝
+		int i;
+
+		if (skb_orphan_frags(skb, gfp_mask) ||
+		    skb_zerocopy_clone(n, skb, gfp_mask)) {
+			kfree_skb(n);
+			n = NULL;
+			goto out;
+		}
+		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+			skb_shinfo(n)->frags[i] = skb_shinfo(skb)->frags[i];// skb_frag_t结构体的赋值，分片数据区是共享的，让新的skb中的分片结构指针指向共享的分片结构数据区。
+			skb_frag_ref(skb, i);// get_page(frag->bv_page) ---> page_ref_inc(page);  分片数据区是共享的，所以增加该数据区所在page的引用次数
+		}
+		skb_shinfo(n)->nr_frags = i;// 新旧分片个数肯定一样
+	}
+
+	if (skb_has_frag_list(skb)) {// 这里是链表形式组织的分片的拷贝, skb_shinfo(skb)->frag_list != NULL;
+		skb_shinfo(n)->frag_list = skb_shinfo(skb)->frag_list;
+		skb_clone_fraglist(n);// skb_walk_frags遍历链表上的每个skb，执行skb_get，增加ref count，因为这种组织形式也是共享的
+	}
+
+	skb_copy_header(n, skb);
+out:
+	return n;
+}
+```
+
+主要是分配skb及数据区内存----》对数据区拷贝赋值----》处理分片结构数据区内存----》为其他成员变量拷贝赋值。
+
+![](D:\10000_works\zzztmp\截图\pskb_copy.png)
+
+
+
+### skb_copy
+
+```c
+
+/**
+ *	skb_copy	-	create private copy of an sk_buff
+ *	@skb: buffer to copy
+ *	@gfp_mask: allocation priority
+ *
+ *	Make a copy of both an &sk_buff and its data. This is used when the
+ *	caller wishes to modify the data and needs a private copy of the
+ *	data to alter. Returns %NULL on failure or the pointer to the buffer
+ *	on success. The returned buffer has a reference count of 1.
+ *
+ *	As by-product this function converts non-linear &sk_buff to linear
+ *	one, so that &sk_buff becomes completely private and caller is allowed
+ *	to modify all the data of returned buffer. This means that this
+ *	function is not recommended for use in circumstances when only
+ *	header is going to be modified. Use pskb_copy() instead.
+ */
+
+struct sk_buff *skb_copy(const struct sk_buff *skb, gfp_t gfp_mask)
+{
+	int headerlen = skb_headroom(skb);// headroom: skb->data - skb->head;
+	unsigned int size = skb_end_offset(skb) + skb->data_len;// skb->end - skb->head + skb->data_len = skb->len
+	struct sk_buff *n = __alloc_skb(size, gfp_mask,
+					skb_alloc_rx_flag(skb), NUMA_NO_NODE);// 也包括了分片数据区的内存部分
+
+	if (!n)
+		return NULL;
+
+	/* Set the data pointer */
+	skb_reserve(n, headerlen);
+	/* Set the tail pointer and length */
+	skb_put(n, skb->len);
+
+	BUG_ON(skb_copy_bits(skb, -headerlen, n->head, headerlen + skb->len));
+
+	skb_copy_header(n, skb);
+	return n;
+}
+
+/**	
+ *	skb_copy_bits - copy bits from skb to kernel buffer
+ *	@skb: source skb
+ *	@offset: offset in source				-headroom
+ *	@to: destination buffer					head指针
+ *	@len: number of bytes to copy			headroom + skb->len
+ *
+ *	Copy the specified number of bytes from the source skb to the
+ *	destination buffer.
+ *
+ *	CAUTION ! :
+ *		If its prototype is ever changed,
+ *		check arch/{*}/net/{*}.S files,
+ *		since it is called from BPF assembly code.
+ */
+// http://blog.chinaunix.net/uid-26940719-id-3199680.html
+int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len)
+{
+	int start = skb_headlen(skb);// skb->len - skb->data_len;	skb数据区长度
+	struct sk_buff *frag_iter;
+	int i, copy;
+
+	if (offset > (int)skb->len - len)// skb->len - (skb->data - skb->head + skb->len) = -(skb->data - skb->head)
+		goto fault;
+
+	/* Copy header. */
+	if ((copy = start - offset) > 0) {// skb数据区长度 + headroom长度
+		if (copy > len)
+			copy = len;
+        // memcpy(to, skb->data - headroom, copy) ---> memcpy(to, skb->head, copy)
+        // skb的headroom和数据区，都拷贝到新的对应区域
+		skb_copy_from_linear_data_offset(skb, offset, to, copy);
+		if ((len -= copy) == 0)
+			return 0;
+		offset += copy;// -headroom长度 + (skb数据区长度 + headroom长度) = skb数据区长度
+		to     += copy;// head指针 +  (skb数据区长度 + headroom长度) = skb数据区结尾处
+	}
+
+	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		int end;
+		skb_frag_t *f = &skb_shinfo(skb)->frags[i];
+
+		WARN_ON(start > offset + len);
+
+		end = start + skb_frag_size(f);// start + frag->bv_len
+		if ((copy = end - offset) > 0) {// start + frag->bv_len - skb数据区长度 = frag->bv_len, copy就是当前分片的长度
+			u32 p_off, p_len, copied;
+			struct page *p;
+			u8 *vaddr;
+
+			if (copy > len)
+				copy = len;
+
+			skb_frag_foreach_page(f,
+					      skb_frag_off(f) + offset - start,
+					      copy, p, p_off, p_len, copied) {
+				vaddr = kmap_atomic(p);
+				memcpy(to + copied, vaddr + p_off, p_len);// 复制分片数据块中的内容，能看到to指向dest位置
+				kunmap_atomic(vaddr);
+			}
+
+			if ((len -= copy) == 0)
+				return 0;
+			offset += copy;
+			to     += copy;// to移动到下一个分片存储位置，准备下一个分片的数据拷贝
+		}
+		start = end;
+	}
+
+	skb_walk_frags(skb, frag_iter) {
+		int end;
+
+		WARN_ON(start > offset + len);
+
+		end = start + frag_iter->len;
+		if ((copy = end - offset) > 0) {
+			if (copy > len)
+				copy = len;
+			if (skb_copy_bits(frag_iter, offset - start, to, copy))
+				goto fault;
+			if ((len -= copy) == 0)
+				return 0;
+			offset += copy;
+			to     += copy;// to移动到下一个分片存储位置，准备下一个分片的数据拷贝
+		}
+		start = end;
+	}
+
+	if (!len)
+		return 0;
+
+fault:
+	return -EFAULT;
+}
+```
+
+
+
+![](D:\10000_works\zzztmp\截图\skb_copy.png)
+
+
+
+首先还是来说下sk_buff结构及相关结构体，第一块是sk_buff自身结构体，第二块是sk_buff结构的数据区及分片结构体（他们始终在一起），第三块则是分片结构中的数据区。
+然后来总结下各个函数的不同点：
+        skb_clone（）函数仅仅是克隆个sk_buff结构体，其他数据都是共享；
+        pskb_copy()函数克隆复制了sk_buff和其数据区(包括分片结构体)，其他数据共享；
+        skb_copy()函数则是完全的复制拷贝函数了，把sk_buff结构体和其数据区（包括分片结构体）、分片结构的数据区都复制拷贝了一份。
+为什么要定义这么多个复制拷贝函数呢？ 其真正的原因是：不能修改共享数据。所以如果想要修改共享数据，只能把这份共享数据拷贝一份，因此就有了这几个不同的复制拷贝函数了。 选择使用哪个复制拷贝函数时就根据你所要修改的哪块共享数据区来定。
 
 ------
 

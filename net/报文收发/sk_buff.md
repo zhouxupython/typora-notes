@@ -42,17 +42,17 @@ https://zhuanlan.zhihu.com/p/369623317  深入理解ICMP协议
 
 
 
-| [Linux内核网络源码解析1——sk_buff结构](https://liu-jianhao.github.io/2019/05/linux内核网络源码解析1sk_buff结构/) |      |      |
-| ------------------------------------------------------------ | ---- | ---- |
-| [Linux内核网络源码解析2——sk_buff操作](https://liu-jianhao.github.io/2019/05/linux内核网络源码解析2sk_buff操作/) |      |      |
-|                                                              |      |      |
-|                                                              |      |      |
-|                                                              |      |      |
-|                                                              |      |      |
-|                                                              |      |      |
-|                                                              |      |      |
-|                                                              |      |      |
-|                                                              |      |      |
+| [Linux内核网络源码解析1——sk_buff结构](https://liu-jianhao.github.io/2019/05/linux内核网络源码解析1sk_buff结构/) |         |      |
+| ------------------------------------------------------------ | ------- | ---- |
+| [Linux内核网络源码解析2——sk_buff操作](https://liu-jianhao.github.io/2019/05/linux内核网络源码解析2sk_buff操作/) |         |      |
+| [linux内核网络sk_buff结构详解](https://blog.csdn.net/yuzhihui_no1/category_9262940.html) | 5篇都读 |      |
+|                                                              |         |      |
+|                                                              |         |      |
+|                                                              |         |      |
+|                                                              |         |      |
+|                                                              |         |      |
+|                                                              |         |      |
+|                                                              |         |      |
 
 
 
@@ -338,6 +338,8 @@ static inline int __pskb_trim(struct sk_buff *skb, unsigned int len)
 
 ## skb_split
 
+==参数len为拆分后的skb的新长度==
+
 ```c
 /*
 拆分数据：skb_split()
@@ -357,18 +359,42 @@ void skb_split(struct sk_buff *skb, struct sk_buff *skb1, const u32 len)
 	else  // （2）反之，如果拆分长度不小于skb数据区中的有效长度，则调用下面函数
 		skb_split_no_header(skb, skb1, len, pos);// 拆分skb结构中的分片结构中数据区数据
 }
- 
+```
+
+（1）当拆分数据的长度小于线性数据长度时，直接拆分线性数据区即可
+
+```c
 // 这是只拆分sk_buff结构数据区的数据，其他参数不变，参数：pos则是sk_buff结构数据区中有效数据长度
 static inline void skb_split_inside_header(struct sk_buff *skb,
 					   struct sk_buff* skb1,
-					   const u32 len, const int pos)
+					   const u32 len, const int pos)//len为拆分后的skb的新长度;pos是skb数据区长度
 {
 	int i;
-	// 这是个把sk_buff结构中有效数据拷贝到新的skb1中,pos为有效数据长度，len为剩下数据长度，得：pos-len为要拷贝的数据长度
-        // skb_put(skb1,pos-len)是移动tail指针让skb1结构数据区空出空间来存放将要拷贝的数据，该函数返回tail指针
-	skb_copy_from_linear_data_offset(skb, len, skb_put(skb1, pos - len),
-					 pos - len);
+	// pos - len 是转移到skb1的数据长度，skb1通过skb_put()来使skb1->tail向下移动pos - len来接收数据。
+    // memcpy(skb_put返回值, skb->data + len, pos - len); 
+    // skb->data的前len字节数据自己仍然保留，余下的pos - len字节，拷贝到skb1->tail开始的位置
+	skb_copy_from_linear_data_offset(skb, len, skb_put(skb1, pos - len), pos - len);
+    
+    // nr_frags为多少个分片数据区，循环把所有分片数据拷贝到skb1中
+	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+		skb_shinfo(skb1)->frags[i] = skb_shinfo(skb)->frags[i];// skb_frag_t结构体的赋值，让skb1中的分片结构关联到分片数据区。
+	
+	//下面做的都是些成员字段拷贝赋值操作，并且设置skb的字段
+	skb_shinfo(skb1)->nr_frags = skb_shinfo(skb)->nr_frags;//skb1拥有所有的 分片数据区，而且其frags[]也已经全部关联到分片数据区了。
+	skb_shinfo(skb)->nr_frags  = 0;// 虽然skb的分片结构没有改变，仍然关联到分片数据区，但是这里通过修改nr_frags，将skb的分片置为“无”
+	skb1->data_len		   = skb->data_len;// skb1拥有所有的 分片数据区
+	skb1->len		   += skb1->data_len;// skb1->len = pos - len + skb1->data_len
+	skb->data_len		   = 0;// skb的分片置为“无”
+	skb->len		   = len;// skb的数据长度是split后的len字节，没有分片数据区
+	skb_set_tail_pointer(skb, len);// ->data不变，skb->tail = skb->data + len;
+}
+
         /*
+        // 这是个把sk_buff结构中有效数据拷贝到新的skb1中,pos为有效数据长度，len为剩下数据长度，得：pos-len为要拷贝的数据长度
+        // skb_put(skb1,pos-len)是移动tail指针让skb1结构数据区空出空间来存放将要拷贝的数据，该函数返回tail指针
+        skb_copy_from_linear_data_offset(skb, len, skb_put(skb1, pos - len),
+                         pos - len);
+					 
 		为了方便理解，把该函数实现代码注释进来
         skb为要被拆分的sk_buff结构，offset为剩下新的skb数据长度，to为skb1结构中tail指针，len为要拷贝的数据长度
         static inline void skb_copy_from_linear_data_offset(const struct sk_buff *skb,
@@ -378,73 +404,75 @@ static inline void skb_split_inside_header(struct sk_buff *skb,
 			// 从skb要剩下的数据位置开始（即是skb->data+offset，skb->data和skb->data+offset之间的数据是要保留的）
             // to则是tail指针移动前返回的一个位置指针（详细请看skb_put()函数实现），拷贝len长度内容
 			memcpy(to, skb->data + offset, len);
-	    }
-        如果对sk_buff结构及相关结构体中成员变量了解，则这些代码就非常好理解了。
-        
+	    }        
 		*/
-    
-    // nr_frags为多少个分片数据区，循环把所有分片数据拷贝到skb1中
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
-		skb_shinfo(skb1)->frags[i] = skb_shinfo(skb)->frags[i];
-	
-	//下面做的都是些成员字段拷贝赋值操作，并且设置skb的字段
-	skb_shinfo(skb1)->nr_frags = skb_shinfo(skb)->nr_frags;
-	skb_shinfo(skb)->nr_frags  = 0;
-	skb1->data_len		   = skb->data_len;
-	skb1->len		   += skb1->data_len;
-	skb->data_len		   = 0;
-	skb->len		   = len;
-	skb_set_tail_pointer(skb, len);// 下面把实现函数代码注释进来，方便理解	
+
  		//	static inline void skb_set_tail_pointer(struct sk_buff *skb, const int offset)
 		//	{
 		//		// 这是把tail指针移到数据区的最后面
 		//		skb->tail = skb->data + offset;	
 		//	}
-}
+```
 
+
+
+![](D:\10000_works\zzztmp\截图\skb_split-直接拆分.jpg) 
+
+
+
+（2）拆分数据的长度大于线性数据长度时，则需要拆分非线性区域中的数据，
+
+例如：拆分长度LEN大于hlen并且LEN小于（hlen + S1），所以需要从S1中取一部分补给skb，S1剩余 S1 - (LEN - hlen)给skb1。
+
+如果分片完全用来补给skb，那么该分片数据区仅仅关联skb，与skb1无关。
+
+```c
 // 这是拆分分片结构数据区数据，同理，其他参数不变，参数：pos则是sk_buff结构数据区中有效数据长度
 static inline void skb_split_no_header(struct sk_buff *skb,
 				       struct sk_buff* skb1,
-				       const u32 len, int pos)
+				       const u32 len, int pos)//len为拆分后的skb的新长度;pos是skb数据区长度
 {
 	int i, k = 0;
 	// 开始设置sk_buff结构数据区内容
-	const int nfrags = skb_shinfo(skb)->nr_frags;
-	skb_shinfo(skb)->nr_frags = 0;
-	skb1->len		  = skb1->data_len = skb->len - len;
-	skb->len		  = len;
-	skb->data_len		  = len - pos;
+	const int nfrags 				= skb_shinfo(skb)->nr_frags;
+	skb_shinfo(skb)->nr_frags 		= 0;// 因为当前不知道需要几个分片数据能够补上len，所以先为0
+	skb1->len		  				= skb1->data_len = skb->len - len;// skb1只有分片数据区
+	skb->len		  				= len;
+	skb->data_len		  			= len - pos;// skb的数据区长度不够，所以不可能再分割，还是pos字节，那么需要还分片数据区长度len - pos
 	
 	// 这是循环拆分分片结构数据区数据
 	for (i = 0; i < nfrags; i++) {
 		int size = skb_shinfo(skb)->frags[i].size;
-	// 其实拆分，数据区存储不会动，动的只是指向这些数据存储的位置指针
-       //  下面都是把skb的一些指向分片结构数据区的指针赋值给skb1中的数据区相关变量
+		// 其实拆分，数据区存储不会动，动的只是指向这些数据存储的位置指针
+        // 下面都是把skb的一些指向分片结构数据区的指针赋值给skb1中的数据区相关变量
+        // pos不再表示skb的数据区长度，而是当前skb的数据总长度。判断当前skb总长度加上当前分片长度是否满足len：满足
+        // 所以拆分当前分片，部分给skb，刚好总长度达到len；其余给skb1
 		if (pos + size > len) {
+            // 第一次进入时，k为0，size的一部分长度会分给skb1的第一个分片数据区
+            // 继续循环时，还会进入这里，k持续增加，也就是满足skb的len要求后，剩余的分片，全部给skb1（@@@继续循环继续吃@@@）
 			skb_shinfo(skb1)->frags[k] = skb_shinfo(skb)->frags[i];
-			if (pos < len) {
+			if (pos < len) {// 仅满足一次，也就是满足了len要求后，skb吃饱了，就不再吃了
+                // pos + size > len && pos < len，说明第一次pos达到len要求；后面pos += size;以后，肯定不会再进来了
+                // 当前分片数据区长度满足分割要求时，分成两部分
 				get_page(skb_shinfo(skb)->frags[i].page);
-				skb_shinfo(skb1)->frags[0].page_offset += len - pos;
-				skb_shinfo(skb1)->frags[0].size -= len - pos;
-				skb_shinfo(skb)->frags[i].size	= len - pos;
-				skb_shinfo(skb)->nr_frags++;
+				skb_shinfo(skb1)->frags[0].page_offset += len - pos;// 分片数据区偏移len - pos后，是skb1的第一个分片数据区的开始
+				skb_shinfo(skb1)->frags[0].size -= len - pos;// skb1的第一个分片数据区长度，因为需要拿出len - pos给skb
+				skb_shinfo(skb)->frags[i].size	= len - pos;// skb的最后一个分片数据区长度，skb吃饱了
+				skb_shinfo(skb)->nr_frags++;				// skb的最后一个分片数据区长度，skb吃饱了
 			}
-			k++;
-		} else
+			k++;//@@@继续循环继续吃@@@
+		} 
+        else// 不满足，skb完全吃下当前分片，@@@继续循环继续吃@@@
 			skb_shinfo(skb)->nr_frags++;
+        
+        // 当进入分支if (pos < len)后，再执行到这一步，pos会大于len，不会再进入这个if分支了。所以后面skb分片不再变化，skb1吃掉剩余的分片
 		pos += size;
 	}
 	skb_shinfo(skb1)->nr_frags = k;
 }
 ```
 
-（1）当拆分数据的长度小于线性数据长度时，直接拆分线性数据区即可
 
-![](D:\10000_works\zzztmp\截图\skb_split-直接拆分.jpg) 
-
-（2）拆分数据的长度大于线性数据长度时，则需要拆分非线性区域中的数据，拆分长度LEN大于hlen并且LEN小于hlen+S1
-
-所以需要从S1中取一部分补上，S1剩余 S1-(LEN-hlen)
 
 ![](D:\10000_works\zzztmp\截图\skb_split-拆分非线性区域.jpg)
 

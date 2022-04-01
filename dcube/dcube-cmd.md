@@ -62,9 +62,13 @@
 
 
 
-​						**packetcapture**  		Create a packetcapture cube
+​						**packetcapture**  		Create a packetcapture cube with specified hook type.
 
 ​									*CUBE_NAME*
+
+  							--log-level string   trace log level < debug | info | warning | ==error== | none >  (default "error")
+
+  							-t, --type string        hook type <==xdp-in== | tc-in | tc-out | tc-both> (default "xdp-in")
 
 
 
@@ -834,3 +838,28 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 > （1）LB_CUBE_NAME			 cubectl loadbalancer set snat-rule lb0 --ipv4 1.2.3.4
 >
 > （2）-g GROUP_NAME			cubectl loadbalancer set snat-rule -g gp0 --ipv4 1.2.3.4
+
+------
+
+## packetcapture
+
+**packetcapture**						Packetcapture Cube Subcommands
+
+​	  **set**         	set a packetcapture cube
+
+​				  **dump**        	specify the place where the captured packets will be dumped.
+​							==*CUBE_NAME*==
+​									 --dump string   the place where the captured packets will be dumped
+
+​				   **filter**      		specify the filter used within this packet capture service.
+​							==*CUBE_NAME*==
+  									--filter string   <font style="background-color:#ff0000">tcpdump-like filter</font> (default "==all==")
+
+​				   **header**      	specify to capture the packet header only instead of the entire packet.
+​							==*CUBE_NAME*==
+​									  --header   <true | ==false==>
+
+​				   **snaplen**        specify the number of bytes max to read per packet.
+​							==*CUBE_NAME*==
+ 									 --snaplen uint32   packet snap length
+

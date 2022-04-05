@@ -8,3 +8,6 @@ https://www.iovisor.org/technology/xdp
 
 
 
+https://blog.apnic.net/2020/09/02/journeying-into-xdp-part-0/
+
+https://gitlab.epfl.ch/debeule/bpf/-/blob/master/LOG.md	

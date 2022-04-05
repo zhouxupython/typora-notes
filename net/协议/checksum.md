@@ -213,3 +213,21 @@ long sum = 0;
 http://yaxin-cn.github.io/Python/icmp-packet-checksum-with-python.html
 
 [计算IP、ICMP、TCP和UDP包的校验和    ](http://arondight.me/2016/03/22/%E8%AE%A1%E7%AE%97IP%E3%80%81ICMP%E3%80%81TCP%E5%92%8CUDP%E5%8C%85%E7%9A%84%E6%A0%A1%E9%AA%8C%E5%92%8C/)
+
+ 
+
+
+
+http://www.metools.info/code/c128.html		累加和（CheckSum）校验在线计算
+
+https://juejin.cn/post/6844904131031728141	Checksum 计算方式
+
+https://blog.csdn.net/lisayh/article/details/81110287	checksum计算方法
+
+https://hechao.li/2020/04/10/Checksum-or-fxxk-up/
+
+https://blog.apnic.net/2020/09/02/journeying-into-xdp-part-0/
+
+https://stackoverflow.com/questions/45986312/recalculating-tcp-checksum-in-linux-kernel-module
+
+https://patchwork.ozlabs.org/project/netdev/patch/190fead2d6136865cb2c8f7e94bcf3fbf4eea23f.1455899111.git.daniel@iogearbox.net/

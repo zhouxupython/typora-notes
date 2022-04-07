@@ -8,7 +8,7 @@ kernel：1.2.13
 
 
 
-![tcp状态转移](tcp状态转移.jpg)
+
 
 
 
@@ -343,12 +343,12 @@ int tcp_rcv(struct sk_buff *skb, struct device *dev, struct options *opt,
 
 ```c
 // close系统调用最终会走到这儿
-
+// c s 两边的关闭，都会走到这儿
 static void tcp_close(struct sock *sk, int timeout)
 {
 	sk->inuse = 1;
 	
-	if(sk->state == TCP_LISTEN)// 监听套接字，释放所有缓存的连接请求，然后直接关掉即可
+	if(sk->state == TCP_LISTEN)// s 监听套接字，释放所有缓存的连接请求，然后直接关掉即可
 	{
 		/* Special case */
 		tcp_set_state(sk, TCP_CLOSE);
@@ -363,7 +363,7 @@ static void tcp_close(struct sock *sk, int timeout)
 	}
 	else
 	{
-		if(tcp_close_state(sk,1)==1)
+		if(tcp_close_state(sk,1)==1)// @@@ 切换状态 TCP_ESTABLISHED--->TCP_FIN_WAIT1
 		{
 			tcp_send_fin(sk);// 连接套接字，就需要走挥手流程
 		}
@@ -426,7 +426,7 @@ static void tcp_send_fin(struct sock *sk)
 
 
 
-
+### 后续挥手流程
 
 ```c
 
@@ -473,12 +473,13 @@ extern __inline__ int tcp_data(struct sk_buff *skb, struct sock *sk,
 
 			if (skb->h.th->fin) 
 			{
-				tcp_fin(skb,sk,skb->h.th);
+				tcp_fin(skb,sk,skb->h.th);// 这个函数不是发送fin，而是接到fin后进行处理
 			}
-			tcp_send_ack(sk->sent_seq, sk->acked_seq, sk, th, saddr);
+			tcp_send_ack(sk->sent_seq, sk->acked_seq, sk, th, saddr);//@@@
 }
 
-//回复ACK？  tcp_fin仅仅在tcp_data中调用，调用后有tcp_send_ack发送ack
+//这个函数不是发送fin，而是接到fin后进行处理   
+//如何回复ACK？  tcp_fin仅仅在tcp_data中调用，调用后有tcp_send_ack发送ack
 static int tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 {
 	sk->fin_seq = th->seq + skb->len + th->syn + th->fin;
@@ -494,7 +495,7 @@ static int tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 		case TCP_SYN_RECV:
 		case TCP_SYN_SENT:
 		case TCP_ESTABLISHED:// 被动关闭端收到主动关闭端的FIN
-			tcp_set_state(sk,TCP_CLOSE_WAIT);
+			tcp_set_state(sk,TCP_CLOSE_WAIT);:// @@@
 			if (th->rst)
 				sk->shutdown = SHUTDOWN_MASK;
 			break;
@@ -534,5 +535,28 @@ static int tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 	return(0);
 }
 
+```
+
+## 同时关闭
+
+![tcp状态转移](tcp状态转移.jpg)
+
+```c
+static int tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
+{
+	switch(sk->state) 
+	{
+
+        case TCP_FIN_WAIT1:// 发送FIN启动关闭流程后，进入这个状态，然后等待对端发来ACK，以进入WAIT2；但是却收到了FIN，说明对端也进入了关闭流程，就是同时关闭。在tcp_ack中会有后续处理（收到对端的ack，进入TCP_TIME_WAIT）
+
+			if(sk->ip_xmit_timeout != TIME_WRITE)
+				reset_xmit_timer(sk, TIME_WRITE, sk->rto);
+			tcp_set_state(sk,TCP_CLOSING);// @@@
+			break;
+            
+            
+// 继续切换状态
+
+            
 ```
 

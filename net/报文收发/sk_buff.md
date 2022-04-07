@@ -58,9 +58,9 @@ https://zhuanlan.zhihu.com/p/369623317  深入理解ICMP协议
 
 ## sk_buff
 
-![](D:\10000_works\zzztmp\截图\sk_buff_2.6.20.png)
+![](sk_buff/sk_buff_2.6.20.png)
 
-![sk_buff_2.6.20_data_ptr](D:\10000_works\zzztmp\截图\sk_buff_2.6.20_data_ptr.png)
+![sk_buff_2.6.20_data_ptr](sk_buff/sk_buff_2.6.20_data_ptr.png)
 
 
 
@@ -75,7 +75,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 			    int fclone, int node)
 ```
 
-![](D:\10000_works\zzztmp\截图\alloc_skb.png)
+![](sk_buff/alloc_skb.png)
 
 ```c
 /*
@@ -178,7 +178,7 @@ static inline void skb_reserve(struct sk_buff *skb, int len)
 }
 ```
 
-![](D:\10000_works\zzztmp\截图\sk_buff_2.6.20_put_push_pull_reserve.png)
+![](sk_buff/sk_buff_2.6.20_put_push_pull_reserve.png)
 
 **reserve**：
 
@@ -194,7 +194,7 @@ push是高层协议到低层协议，通常用于发送的数据包后在各层�
 
 pull是低层协议到高层协议，通常用于接收的数据包后在各层由下往上传递时，上层忽略下层的==协议==信息。
 
-![](D:\10000_works\zzztmp\截图\sk_buff在各层协议之间传输.png)
+![](sk_buff/sk_buff在各层协议之间传输.png)
 
 ------
 
@@ -210,7 +210,7 @@ pskb_copy
 skb_copy
 ```
 
-![](D:\10000_works\zzztmp\截图\pskb_copy() & skb_copy().png)
+![](sk_buff/pskb_copy() & skb_copy().png)
 
 ------
 
@@ -271,7 +271,9 @@ __wsum csum_partial_copy_from_user(const void __user *src,
 #define copy_from_user(to, from, n)	(memcpy((to), (from), (n)), 0) 
 ```
 
-![](D:\10000_works\zzztmp\截图\skb_add_data.png)
+
+
+![](sk_buff/skb_add_data.png)
 
 ------
 
@@ -306,7 +308,7 @@ static inline void skb_set_tail_pointer(struct sk_buff *skb, const int offset)
 }
 ```
 
-![](D:\10000_works\zzztmp\截图\skb_trim.png)
+![](sk_buff/skb_trim.png)
 
 ------
 
@@ -416,7 +418,7 @@ static inline void skb_split_inside_header(struct sk_buff *skb,
 
 
 
-![](D:\10000_works\zzztmp\截图\skb_split-直接拆分.jpg) 
+![](sk_buff/skb_split-直接拆分.jpg) 
 
 
 
@@ -474,7 +476,7 @@ static inline void skb_split_no_header(struct sk_buff *skb,
 
 
 
-![](D:\10000_works\zzztmp\截图\skb_split-拆分非线性区域.jpg)
+![](sk_buff/skb_split-拆分非线性区域.jpg)
 
 ------
 
@@ -484,7 +486,7 @@ static inline void skb_split_no_header(struct sk_buff *skb,
 
 这个分片结构体和sk_buff结构的数据区是一体的，所以在各种操作时都把他们两个结构看做是一个来操作。
 
-![](D:\10000_works\zzztmp\截图\sk_buff结构的数据区和分片结构的关系图.png)
+![](sk_buff/sk_buff结构的数据区和分片结构的关系图.png)
 
 从上图也可以看出来分片结构和sk_buff的数据区连在一起，==end指针的下个字节==就是分片结构的开始位置。
 
@@ -557,7 +559,7 @@ struct bio_vec {
 };
 ```
 
-![](D:\10000_works\zzztmp\截图\两种存储方式的分片数据区.png)
+![](sk_buff/两种存储方式的分片数据区.png)
 
 ------
 
@@ -902,9 +904,9 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 
 skb_clone()函数的效果图
 
-![](D:\10000_works\zzztmp\截图\skb_clone.png)
+![](sk_buff/skb_clone.png)
 
-![skb_clone2](D:\10000_works\zzztmp\截图\skb_clone2.png)
+![skb_clone2](sk_buff/skb_clone2.png)
 
 其实上面的方法：由skb_clone()函数克隆一个skb，然后共享其他数据。虽然可以提高效率，但是存在一个很大的==缺陷==：
 
@@ -1008,7 +1010,7 @@ out:
 
 主要是分配skb及数据区内存----》对数据区拷贝赋值----》处理分片结构数据区内存----》为其他成员变量拷贝赋值。
 
-![](D:\10000_works\zzztmp\截图\pskb_copy.png)
+![](sk_buff/pskb_copy.png)
 
 
 
@@ -1152,7 +1154,7 @@ fault:
 
 
 
-![](D:\10000_works\zzztmp\截图\skb_copy.png)
+![](sk_buff/skb_copy.png)
 
 
 

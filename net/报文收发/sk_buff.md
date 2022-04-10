@@ -64,6 +64,10 @@ https://zhuanlan.zhihu.com/p/369623317  深入理解ICMP协议
 
 
 
+- [ ] skb结构体 字段分析
+
+
+
 ```c
 /* 分配sk_buff, 图中padding是为了对齐而填充的区域，填充区域上面区域的大小为size
 size，待分配sk_buff的线性存储区的长度

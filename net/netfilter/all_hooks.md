@@ -508,12 +508,12 @@ ip层收包流程概述：
 
 ```c
 // net/core/dev.c	链接packet_type类型
-struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
-struct list_head ptype_all __read_mostly;	/* Taps */
+struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;/* type表示三层类型，IP、ARP等。IP包，即ip_packet_type，就位于这儿 */
+struct list_head ptype_all __read_mostly;	/* Taps 抓包*/
 
 // include/linux/netdevice.h
 struct packet_type {
-    // 标识以太网帧或其他链路层报文承载网络层报文的协议号, 协议标识符，func会使用，保存了三层协议类型，ETH_P_IP、ETH_P_ARP等等
+    // 标识以太网帧或其他链路层报文承载网络层报文的协议号, 协议标识符，func会使用，保存了三层协议类型，ETH_P_IP(0x0800)、ETH_P_ARP(0x0806)等等
 	__be16			type;/* This is really htons(ether_type). */
     
 	bool			ignore_outgoing;

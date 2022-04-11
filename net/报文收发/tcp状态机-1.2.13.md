@@ -495,7 +495,7 @@ static int tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 		case TCP_SYN_RECV:
 		case TCP_SYN_SENT:
 		case TCP_ESTABLISHED:// 被动关闭端收到主动关闭端的FIN
-			tcp_set_state(sk,TCP_CLOSE_WAIT);:// @@@
+			tcp_set_state(sk,TCP_CLOSE_WAIT);// @@@
 			if (th->rst)
 				sk->shutdown = SHUTDOWN_MASK;
 			break;
@@ -537,6 +537,112 @@ static int tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 
 ```
 
+
+
+```c
+
+/*
+ *	A TCP packet has arrived.	理解这个函数，需要脑袋分裂成双重人格，一会把自己当成s，一会当成c，才行，因为s、c运行的是这个同一套代码。而且要注意，get_sock的返回值，可能是监听，也可能是连接套接字，需要讨论
+ */
+ 
+int tcp_rcv(struct sk_buff *skb, struct device *dev, struct options *opt,
+	unsigned long daddr, unsigned short len,
+	unsigned long saddr, int redo, struct inet_protocol * protocol)
+{
+	struct tcphdr *th;
+	struct sock *sk;
+	int syn_ok=0;
+	
+	th = skb->h.th;
+
+	sk = get_sock(&tcp_prot, th->dest, saddr, th->source, daddr);//内部机制能够保证：如果是握手连接的第一个报文，那么get的是监听套接字；否则根据最佳匹配，get的是连接套接字
+
+	skb->sk=sk;
+
+	//除了握手的第一个报文，后续报文都包含有ack，普通数据发送时，也会有ack
+	if(th->ack && !tcp_ack(sk,th,saddr,len))
+	{
+
+		return 0;
+	}
+	
+	release_sock(sk);
+	return 0;
+}
+
+
+extern __inline__ int tcp_ack(struct sock *sk, struct tcphdr *th, unsigned long saddr, int len)
+{
+
+
+	if (skb_peek(&sk->write_queue) != NULL) {}
+	else
+	{
+
+		switch(sk->state) {
+		case TCP_TIME_WAIT:// TCP_TIME_WAIT状态，除非收到FIN，才会重新发送ACK，否则重置定时器
+			reset_msl_timer(sk, TIME_CLOSE, TCP_TIMEWAIT_LEN);
+			break;
+		case TCP_CLOSE:
+			/*
+			 * don't touch the timer.
+			 */
+			break;
+		default:
+			
+			break;
+		}
+	}
+
+	if (sk->state == TCP_LAST_ACK) // s
+	{
+		if (!sk->dead)
+			sk->state_change(sk);
+		if (sk->rcv_ack_seq == sk->write_seq /*&& sk->acked_seq == sk->fin_seq*/) 
+		{
+			flag |= 1;
+			tcp_set_state(sk,TCP_CLOSE);
+			sk->shutdown = SHUTDOWN_MASK;
+		}
+	}
+
+	if (sk->state == TCP_FIN_WAIT1) // c
+	{
+
+		if (!sk->dead) 
+			sk->state_change(sk);
+		if (sk->rcv_ack_seq == sk->write_seq) 
+		{
+			flag |= 1;
+			sk->shutdown |= SEND_SHUTDOWN;
+			tcp_set_state(sk, TCP_FIN_WAIT2);
+		}
+	}
+
+	if (sk->state == TCP_CLOSING) // c s
+	{
+
+		if (!sk->dead) 
+			sk->state_change(sk);
+		if (sk->rcv_ack_seq == sk->write_seq) 
+		{
+			flag |= 1;
+			tcp_time_wait(sk);// TCP_TIME_WAIT
+		}
+	}
+	
+
+	
+}
+
+```
+
+
+
+
+
+
+
 ## 同时关闭
 
 ![tcp状态转移](tcp状态转移.jpg)
@@ -556,7 +662,88 @@ static int tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
             
             
 // 继续切换状态
+extern __inline__ int tcp_ack(struct sock *sk, struct tcphdr *th, unsigned long saddr, int len)
+{
+    if (sk->state == TCP_CLOSING) // c s
+	{
 
-            
+		if (!sk->dead) 
+			sk->state_change(sk);
+		if (sk->rcv_ack_seq == sk->write_seq) 
+		{
+			flag |= 1;
+			tcp_time_wait(sk);// TCP_TIME_WAIT
+		}
+	}
+	
+
+	
+}     
+```
+
+
+
+## 2MSL
+
+```c
+
+
+/*
+ *	A TCP packet has arrived.	理解这个函数，需要脑袋分裂成双重人格，一会把自己当成s，一会当成c，才行，因为s、c运行的是这个同一套代码。而且要注意，get_sock的返回值，可能是监听，也可能是连接套接字，需要讨论
+ */
+ 
+int tcp_rcv(struct sk_buff *skb, struct device *dev, struct options *opt,
+	unsigned long daddr, unsigned short len,
+	unsigned long saddr, int redo, struct inet_protocol * protocol)
+{
+	struct tcphdr *th;
+	struct sock *sk;
+	int syn_ok=0;
+	
+	th = skb->h.th;
+
+	sk = get_sock(&tcp_prot, th->dest, saddr, th->source, daddr);//内部机制能够保证：如果是握手连接的第一个报文，那么get的是监听套接字；否则根据最佳匹配，get的是连接套接字
+
+	skb->sk=sk;
+
+	if(sk->state!=TCP_ESTABLISHED)		/* Skip this lot for normal flow */
+	{
+	
+		
+
+        /*
+         *	BSD has a funny hack with TIME_WAIT and fast reuse of a port. There is
+         *	a more complex suggestion for fixing these reuse issues in RFC1644
+         *	but not yet ready for general use. Also see RFC1379.
+
+	        // port reuse，socket创建的时候，可以设置这种标志，用于复用端口号。
+	        2MSL等待期间（满足sk->dead），又收到了SYN，当前sk是连接套接字。
+	        那么就将当前这个sk设置为关闭，搜索出对应的监听套接字，然后重新创建一个连接套接字，用于新的tcp连接，
+	        即连接套接字组装了连接答复报文SYNACK，回复给客户端，和监听套接字没有关系了，并设置自身状态为TCP_SYN_RECV
+
+         */
+	
+		if (sk->state == TCP_TIME_WAIT && th->syn && sk->dead && 
+			after(th->seq, sk->acked_seq) && !th->rst)
+		{
+			tcp_set_state(sk, TCP_CLOSE);// 
+			sk->shutdown = SHUTDOWN_MASK;
+			release_sock(sk);
+		
+			sk=get_sock(&tcp_prot, th->dest, saddr, th->source, daddr);// 这句代码之前的sk是处于2MSL等待期间的sk，已经在关闭阶段了，设置为TCP_CLOSE后，彻底关闭。内部机制能够保证这里get_sock获取到的是监听套接字，用于创建新的连接套接字
+			if (sk && sk->state==TCP_LISTEN)// 监听套接字肯定是处于监听状态
+			{
+				sk->inuse=1;
+				skb->sk = sk;// 收到的这个skb包，由监听套接字处理     skb->sk = sk 这句话，感觉就是skb这个数据包分配给sk这个套接字处理
+				sk->rmem_alloc += skb->mem_len;
+				tcp_conn_request(sk, skb, daddr, saddr,opt, dev,seq+128000);// 这里创建了新的连接套接字，用于新一次的tcp连接，旧的连接（可能与这个新的连接在五元组上完全一致）已经彻底关闭了。
+				release_sock(sk);
+				return 0;
+			}
+			kfree_skb(skb, FREE_READ);
+			return 0;
+		}
+
+	}
 ```
 

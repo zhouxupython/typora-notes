@@ -206,7 +206,7 @@ while (1)
 
 ------
 
-## BCC中的map定义
+## map定义
 
 ```c
 // 定义HASH_MAP，使用 BCC 宏定义，key 为 u64 类型，value 为 struct val_t 结构；
@@ -300,3 +300,48 @@ c代码对应的定义方式
 k含义
 
 v含义
+
+------
+
+### BPF_MAP_TYPE_PERF_EVENT_ARRAY
+
+k含义：u32，可以为cpu个数
+
+v含义：u32，作为perf event buffer从内核往用户空间传递数据时，是 SYS_PERF_EVENT_OPEN系统调用的返回值，表示一个fd。
+
+​             参见bpf_read/PerfBuffer_RingBuffer.md
+
+```go
+func CreatePerfMap(mapPath string, maxEntries uint32) (int, error) {
+	var key, val uint32
+	cfg := MapConfig{
+		MapType:    BPF_MAP_TYPE_PERF_EVENT_ARRAY,
+		KeySize:    unsafe.Sizeof(key),
+		ValSize:    unsafe.Sizeof(val),
+		MaxEntries: maxEntries,
+	}
+
+	fd, err := CreatePinnedMapFd(&cfg, mapPath)
+	if err != nil {
+		return -1, err
+	}
+	return fd, nil
+}
+
+rf.perfFd, err = unix.PerfEventOpen(&attr, -1, rf.cpuIdx, -1, unix.PERF_FLAG_FD_CLOEXEC)
+
+MapUpdate(p.BpfMapFd, unsafe.Pointer(&cpuIdx), unsafe.Pointer(&rf.perfFd), 0)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

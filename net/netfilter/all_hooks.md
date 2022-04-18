@@ -1,5 +1,7 @@
 ## 所有nf的hooks顺序图
 
+![图示hook点顺序](图示hook点顺序.jpg)
+
 [netfilter hook函数](https://www.jianshu.com/p/8c6342998cfa)
 
 ![](hooks1-16473568780911.png)

@@ -1,5 +1,13 @@
 # bpftool
 
+[上手 bpftool](https://blog.csdn.net/Longyu_wlz/article/details/109931993)
+
+[bpftool安装教程](https://blog.csdn.net/weixin_44260459/article/details/123036982)	apt
+
+https://github.com/cloudflare/bpftools
+
+
+
 ## bpftool 用法简介
 
 http://tinylab.org/ebpf-part1/

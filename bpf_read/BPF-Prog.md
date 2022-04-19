@@ -1,3 +1,27 @@
+
+
+## 收集
+
+[BPF程序类型及其原理](https://blog.csdn.net/weixin_41036447/article/details/107817340)
+
+
+
+每个都需要搞清楚：
+
+ebpf prog函数原型、参数含义
+
+是否可以修改数据包	不允许
+
+用途
+
+在哪儿有例子（项目、bcc、libbpf、samples）
+
+==是否可以归类，或者进行比较==
+
+
+
+
+
 ## BPF_PROG_TYPE_SOCKET_FILTER 
 
 BPF_PROG_TYPE_SOCKET_FILTER是第一个添加到Linux内核的程序类型。将BPF程序附加到原始套接字时，可以访问该套接字处理的所有数据包。Socket Filter Programs==不允许==您修改这些数据包的内容或更改这些数据包的目的地；它们只允许您出于可观察的目的访问这些数据包。程序接收的元数据包含与网络堆栈相关的信息，例如用于传递数据包的协议类型。我们将在第6章详细介绍套接字过滤和其他网络程序。

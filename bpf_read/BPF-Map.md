@@ -337,9 +337,43 @@ MapUpdate(p.BpfMapFd, unsafe.Pointer(&cpuIdx), unsafe.Pointer(&rf.perfFd), 0)
 
 
 
+### BPF_MAP_TYPE_PERCPU_ARRAY
 
+samples/bpf/xdp1_kern.c
 
+samples/bpf/xdp1_user.c
 
+typora-notes/bpf_read/samples/xdp1.md
+
+```c
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, u32);
+	__type(value, long);//根据key搜索到的是一个数组，大小是cpu个数，数组的每个元素，就是value
+	__uint(max_entries, 256);// key：0～255，总共256个
+} rxcnt SEC(".maps");
+
+unsigned int nr_cpus = bpf_num_possible_cpus();
+__u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
+while (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
+    __u32 key = UINT32_MAX;
+    __u64 sum = 0;
+
+    assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
+    for (i = 0; i < nr_cpus; i++)
+        sum += values[i];
+    if (sum > prev[key])
+        printf("proto %u: %10llu pkt/s\n",
+               key, (sum - prev[key]) / interval);
+    prev[key] = sum;//每种协议的丢包总数
+}
+```
+
+使用 bpf_map_lookup_elem(map_fd, &key, values) 获取的 values 是个数组，大小就是运行环境的cpu个数，数组的元素类型就是map定义时的value
+
+例子中，key是==协议类型==，values是个数组，每个元素是各个cpu的丢包数，也就是value。
+
+所以协议对应的values中每个元素的和，就是这种协议类型在所有cpu上的丢包总和。
 
 
 

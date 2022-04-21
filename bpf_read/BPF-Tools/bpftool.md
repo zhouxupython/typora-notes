@@ -43,6 +43,12 @@ wu@ubuntu:~/linux/samples/bpf$ sudo bpftool prog show
 	xlated 192B  jited 119B  memlock 4096B	map_ids 72
 ```
 
+执行`bpftool prog dump xlated id xxx` 导出ebpf程序的字节码
+
+执行`bpftool prog dump jited id xxx` 导出机器码
+
+------
+
 查看 map 的id，可以看到当前使用的是 hash map：
 
 ```shell

@@ -8,13 +8,17 @@
 
 每个都需要搞清楚：
 
-ebpf prog函数原型、参数含义
+（1）用途
 
-是否可以修改数据包	不允许
+（2）ebpf prog函数原型、参数含义
 
-用途
+（3）是否可以修改数据包	不允许
 
-在哪儿有例子（项目、bcc、libbpf、samples）
+（4）在哪儿有例子（项目、bcc、libbpf、samples）
+
+（5）实现分析
+
+
 
 ==是否可以归类，或者进行比较==
 
@@ -26,13 +30,34 @@ ebpf prog函数原型、参数含义
 
 BPF_PROG_TYPE_SOCKET_FILTER是第一个添加到Linux内核的程序类型。将BPF程序附加到原始套接字时，可以访问该套接字处理的所有数据包。Socket Filter Programs==不允许==您修改这些数据包的内容或更改这些数据包的目的地；它们只允许您出于可观察的目的访问这些数据包。程序接收的元数据包含与网络堆栈相关的信息，例如用于传递数据包的协议类型。我们将在第6章详细介绍套接字过滤和其他网络程序。
 
-ebpf prog函数原型、参数含义
+（1）用途
 
-是否可以修改数据包	不允许
+BPF_PROG_TYPE_SOCKET_FILTER，从宏字面意思比较容易想到实现的是[socket](https://so.csdn.net/so/search?q=socket&spm=1001.2101.3001.7020) filter功能，它区别于sockops和tracepoint等功能，需要额外借助setsockopt能力将功能函数和socket绑定，功能才能真正生效。
 
-用途
+（2）ebpf prog函数原型、参数含义
 
-在哪儿有例子（项目、bcc、libbpf、samples）
+在内核态功能函数中定义==SEC("socketxxxx")==，则会被解析为BPF_PROG_TYPE_SOCKET_FILTER类型功能。
+
+比如内核中实现的三个example程序：
+samples/bpf/sockex1_kern.c --->SEC("socket1")
+samples/bpf/sockex2_kern.c --->SEC("socket2")
+samples/bpf/sockex3_kern.c --->SEC("socket3")
+
+（3）是否可以修改数据包	
+
+不允许
+
+（4）在哪儿有例子（项目、bcc、libbpf、samples）
+
+[linux网络和BPF](https://da1234cao.blog.csdn.net/article/details/115900299)、samples/bpf/sock_example.c、samples/bpf/sockex1-2-3_user.c
+
+```c
+setsockopt(sock, SOL_SOCKET, SO_ATTACH_BPF, prog_fd, sizeof(prog_fd[0]))
+```
+
+（5）实现分析
+
+[BPF_PROG_TYPE_SOCKET_FILTER 功能实现](https://blog.csdn.net/already_skb/article/details/123027350)
 
 ------
 
@@ -96,4 +121,13 @@ XDP程序允许您编写在网络数据包到达内核时很早就执行的代�
 
 ------
 
+## BPF_PROG_TYPE_SOCK_OPS
+
+[ebpf sockops 功能分析](https://blog.csdn.net/already_skb/article/details/122988446)
+
+[ebpf sockops 代码解读](https://blog.csdn.net/already_skb/article/details/123021389)
+
+------
+
 BPF_PROG_TYPE_RAW_TRACEPOINT、BPF_PROG_TYPE_CGROUP_SOCK_ADDR、BPF_PROG_TYPE_SK_REUSEPORT、BPF_PROG_TYPE_FLOW_DISSECTOR、BPF_PROG_TYPE_SCHED_CLS and BPF_PROG_TYPE_SCHED_ACT、BPF_PROG_TYPE_LWT_IN, BPF_PROG_TYPE_LWT_OUT, BPF_PROG_TYPE_LWT_XMIT and BPF_PROG_TYPE_LWT_SEG6LOCAL 、BPF_PROG_TYPE_LIRC_MODE2：略
+

@@ -14,5 +14,15 @@ https://gitlab.epfl.ch/debeule/bpf/-/blob/master/LOG.md
 
 
 
+【Q】
 
+If my NIC driver don’t support XDP, how do I test it
+
+How to show if a NIC driver support xdpoffload
+
+How to show if a XDP program has loaded on a interface
+
+How to translate the bpf code to c format
+
+https://liuhangbin.netlify.app/post/ebpf-and-xdp/
 

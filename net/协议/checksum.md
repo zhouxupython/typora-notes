@@ -1,3 +1,5 @@
+https://hechao.li/2020/04/10/Checksum-or-fxxk-up/
+
 [数据包校验和相关知识](https://blog.csdn.net/hhhhhyyyyy8/article/details/102531155)
 
 [原创                   Linux内核分析 - 网络[十三\]：校验和                       ](https://blog.csdn.net/qy532846454/article/details/7010852)

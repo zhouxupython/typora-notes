@@ -4,7 +4,7 @@
 
 [BPF程序类型及其原理](https://blog.csdn.net/weixin_41036447/article/details/107817340)
 
-
+[一文搞懂所有bpf程序分类](https://blog.csdn.net/weixin_41036447/article/details/106473865)
 
 每个都需要搞清楚：
 
@@ -12,7 +12,7 @@
 
 （2）ebpf prog函数原型、参数含义
 
-（3）是否可以修改数据包	不允许
+（3）是否可以修改数据包
 
 （4）在哪儿有例子（项目、bcc、libbpf、samples）
 
@@ -77,6 +77,20 @@ setsockopt(sock, SOL_SOCKET, SO_ATTACH_BPF, prog_fd, sizeof(prog_fd[0]))
 
 XDP程序允许您编写在网络数据包到达内核时很早就执行的代码。由于内核本身没有太多时间来处理信息，因此它只公开来自数据包的有限信息集。因为数据包是在早期执行的，所以您对如何处理该数据包有更高级别的控制。XDP程序定义了几个可以控制的操作，这些操作允许您决定如何处理数据包。您可以从XDP程序返回XDP_PASS ，这意味着数据包应该传递到kernel中的下一个子系统。您还可以返回XDP_DROP，这意味着内核应该完全忽略这个数据包，而不做任何其他处理。您还可以返回 XDP_TX，这意味着数据包应该转发回最初接收到数据包的网络接口卡（NIC）。
 
+（1）用途
+
+（2）ebpf prog函数原型、参数含义
+
+（3）是否可以修改数据包	
+
+允许，XDP 层运行的 BPF 程序能够任意修改（mangle）数据包，即使是 BPF 辅助函数都能增加或减少包的 headroom，这样就可以在将包再次发送出去之前，对包进行任何的封装/解封装。
+
+利用 `XDP_TX` 能够实现 hairpinned（发卡）模式的负载均衡器，这种均衡器能够在接收到包的网卡（修改包之后）再次将包发送出去，而 `XDP_REDIRECT` 动作能够将包转发到另一个 网卡然后发送出去。
+
+（4）在哪儿有例子（项目、bcc、libbpf、samples）
+
+（5）实现分析
+
 ------
 
 ## BPF_PROG_TYPE_PERF_EVENT
@@ -119,9 +133,13 @@ XDP程序允许您编写在网络数据包到达内核时很早就执行的代�
 
 这些类型的程序允许您控制是否应该传递发送到套接字的消息。
 
+[[译] 利用 ebpf sockmap/redirection 提升 socket 性能（2020）](http://arthurchiao.art/blog/socket-acceleration-with-ebpf-zh/)
+
 ------
 
 ## BPF_PROG_TYPE_SOCK_OPS
+
+[[译] 利用 ebpf sockmap/redirection 提升 socket 性能（2020）](http://arthurchiao.art/blog/socket-acceleration-with-ebpf-zh/)
 
 [ebpf sockops 功能分析](https://blog.csdn.net/already_skb/article/details/122988446)
 

@@ -2,6 +2,8 @@
 
 [【译】eBPF 概述：第 5 部分：跟踪用户进程](https://www.ebpf.top/post/ebpf-overview-part-5/)
 
+[在bpfTrace中使用USDT](https://lizhaolong.blog.csdn.net/article/details/119978739)
+
 [libstapsdt](https://github.com/sthima/libstapsdt)
 
 ebpf-experiments/1_bcc/2_libstapsdt

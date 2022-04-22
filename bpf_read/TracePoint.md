@@ -4,3 +4,5 @@ typora-notes/bpf_read/BCC/bcc-1.md：[【BPF入门系列-10】使用 tracepoint 
 
 [ebpf tracepoint 功能分析](https://blog.csdn.net/already_skb/article/details/123023485)
 
+[浅谈动态追踪：从SystemTap到bpfTrace](https://lizhaolong.blog.csdn.net/article/details/120568408)
+

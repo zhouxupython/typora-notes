@@ -303,6 +303,14 @@ static inline int deliver_skb(struct sk_buff *skb,
 }
 ```
 
+# [TCP/IP 协议栈在 Linux 内核中的运行时序分析](https://www.cnblogs.com/luoyang-/p/14349884.html)
+
+# [Linux 内核网络栈分析: 接收数据](https://lizhaolong.blog.csdn.net/article/details/123517286)
+
+
+
+[tcp/ip发送接收总体框架](https://blog.csdn.net/hzj_001/article/details/81542483)
+
 [linux网卡报文接收流程](https://blog.csdn.net/hhhhhyyyyy8/article/details/102492680)
 
 [原创                   Linux内核分析 - 网络[二\]：网卡驱动接收报文                       ](https://blog.csdn.net/qy532846454/article/details/6288261)

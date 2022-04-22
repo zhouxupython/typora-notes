@@ -113,12 +113,15 @@ I suspect clang compiles out the assignments for `data` and `data_end` if you do
 
 
 
-
-
-
-
-
-
-
-
 ### 这三个函数功能
+
+参考typora-notes/net/协议/checksum.md
+
+------
+
+
+
+## [eBPF 指令集](https://houmin.cc/posts/5150fab3/)文章最后列举了一些错误
+
+
+

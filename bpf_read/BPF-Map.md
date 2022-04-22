@@ -333,9 +333,7 @@ rf.perfFd, err = unix.PerfEventOpen(&attr, -1, rf.cpuIdx, -1, unix.PERF_FLAG_FD_
 MapUpdate(p.BpfMapFd, unsafe.Pointer(&cpuIdx), unsafe.Pointer(&rf.perfFd), 0)
 ```
 
-
-
-
+------
 
 ### BPF_MAP_TYPE_PERCPU_ARRAY
 
@@ -375,7 +373,13 @@ while (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
 
 所以协议对应的values中每个元素的和，就是这种协议类型在所有cpu上的丢包总和。
 
+------
 
+### cpumap
 
+`XDP_REDIRECT` 与 `XDP_TX` 类似，但是通过另一个网卡将包发出去。另外， `XDP_REDIRECT` 还可以将包重定向到一个 BPF cpumap，即，当前执行 XDP 程序的 CPU 可以将这个包交给某个远端 CPU，由后者将这个包送到更上层的内核栈，当前 CPU 则继续在这个网卡执行接收和处理包的任务。这**和 `XDP_PASS` 类似，但当前 CPU 不用去做将包送到内核协议栈的准备工作（分配 `skb`，初始化等等），这部分开销还是很大的**。
 
+`XDP_REDIRECT` 返回码还可以和 BPF cpumap 一起使用，对那些目标是本机协议栈、 将由 non-XDP 的远端（remote）CPU 处理的包进行负载均衡。
+
+------
 

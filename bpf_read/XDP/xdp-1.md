@@ -79,6 +79,40 @@ XDP 还提供了额外的 256 字 节 headroom 给 BPF 程序，
 
 XDP 还能够在包的前面 push 元数据（非包内容的数据）。这些元数据对常规的内核栈是不可见的（invisible），但能被 GRO 聚合（匹配元数据），稍后可以和 tc ingress BPF 程序一起处理，tc BPF 中携带了 `skb` 的某些上下文，例如，设置了某些 skb 字段。
 
+#### 调整headroom
+
+##### bpf_xdp_adjust_head
+
+签名： 		int bpf_xdp_adjust_head(struct xdp_buff *xdp_md, int delta)
+
+将 d->data 移动 delta字节，delta可以是负数。
+
+该函数准备用于push/pop headers的封包。
+
+调用此助手函数会导致封包缓冲区改变，因此在加载期间校验器对指针的校验将失效，必须重新校验。
+
+##### bpf_xdp_adjust_meta
+
+签名： 		int bpf_xdp_adjust_meta(struct xdp_buff *xdp_md, int delta)
+
+将 xdp_md->data_meta所指向的地址调整 delta字节。该操作改变了存储在xdp_md->data中的地址信息。
+
+
+
+还有一个skb的
+
+bpf_skb_adjust_room
+
+签名： 		int bpf_skb_adjust_room(struct sk_buff *skb, u32 len_diff, u32 mode, u64 flags)
+
+增加/缩小skb关联的封包的数据的room，增量为len_diff。mode可以是：
+
+1. BPF_ADJ_ROOM_NET，在网络层调整room，即在L3头上增加/移除room space
+
+flags必须置零。
+
+调用此助手函数会导致封包缓冲区改变，因此在加载期间校验器对指针的校验将失效，必须重新校验。
+
 ------
 
 ### XDP 输出参数

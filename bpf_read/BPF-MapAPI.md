@@ -1,6 +1,6 @@
 # ebpf-maps
 
-## API对比
+## c api对比
 
 |         | kernel                                                       | user                                                         |
 | ------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
@@ -34,6 +34,10 @@
 
 
 
+## 创建map
+
+### bpf(BPF_MAP_CREATE
+
 ```c
 #这个是系统调用，是在用户空间使用的，当cmd是BPF_MAP_CREATE时，返回的是内核创建的ebpf-map在用户空间对应的fd 
 #include <linux/bpf.h>
@@ -50,10 +54,10 @@ union bpf_attr my_map_attr {
 int fd = bpf(BPF_MAP_CREATE, &my_map_attr, sizeof(my_map_attr));
 ```
 
+### SEC("maps")
 
-
-```
-#简化版创建map
+```c
+// 简化版创建map
 struct bpf_map_def SEC("maps") my_bpf_map = {
   .type       = BPF_MAP_TYPE_HASH, 
   .key_size   = sizeof(int),
@@ -63,9 +67,9 @@ struct bpf_map_def SEC("maps") my_bpf_map = {
 };
 ```
 
+简化版看起来就是一个BPF Map声明，它是如何做到声明即创建的呢？
 
-
-简化版看起来就是一个BPF Map声明，它是如何做到声明即创建的呢？关键点就是`SEC("maps")`，学名**ELF惯例格式（ELF convention）**，它的工作原理是这样的：
+关键点就是`SEC("maps")`，学名**ELF惯例格式（ELF convention）**，它的工作原理是这样的：
 
 1. 声明ELF Section属性 `SEC("maps")` （之前的[博文](https://davidlovezoe.club/wordpress/archives/937#设计你的第一个XDP程序)里有对Section作用的描述）
 2. 内核代码[`bpf_load.c`](https://elixir.bootlin.com/linux/v4.15/source/samples/bpf/bpf_load.c)respect目标文件中所有Section信息，它会扫描目标文件里定义的Section，其中就有用来创建BPF Map的`SEC("maps")`，
@@ -88,23 +92,17 @@ struct bpf_map_def SEC("maps") my_bpf_map = {
 int load_bpf_file(char *path);
 ```
 
-
-
 1. [`bpf_load.c`](https://elixir.bootlin.com/linux/v4.15/source/samples/bpf/bpf_load.c)扫描到`SEC("maps")`后，对BPF Map相关的操作是由[`load_maps`](https://elixir.bootlin.com/linux/v4.15/source/samples/bpf/bpf_load.c#L212)函数完成，其中的[`bpf_create_map_node()`](https://elixir.bootlin.com/linux/v4.15/source/tools/lib/bpf/bpf.c#L62)和[`bpf_create_map_in_map_node()`](https://elixir.bootlin.com/linux/v4.15/source/tools/lib/bpf/bpf.c#L101)就是创建BPF Map的关键函数，它们背后都是调用了定义在内核代码[tools/lib/bpf/bpf.c](https://elixir.bootlin.com/linux/v4.15/source/tools/lib/bpf/bpf.c)中的方法，而[这个方法](https://elixir.bootlin.com/linux/v4.15/source/tools/lib/bpf/bpf.c#L83)就是使用上文提到的`BPF_MAP_CREATE`命令进行的系统调用。
 2. 最后在编译程序时，通过添加`bpf_load.o`作为依赖库，并合并为最终的可执行文件中，这样在程序运行起来时，就可以通过声明`SEC("maps")`即可完成创建BPF Map的行为了。
 
 从上面梳理的过程可以看到，这个简化版虽然使用了“语法糖”，但最后还是会去使用bpf()函数完成系统调用。
 
-```
-#感觉这三行还是在用户空间执行的阿？ syscall才能到内核空间？？？？？？？？？？？？？？？？？？？？？？？？
+```c
+// 感觉这三行还是在用户空间执行的阿？ syscall才能到内核空间？？？？？？？？？？？？？？？？？？？？？？？？
 int bpf_create_map_node()
 sys_bpf(BPF_MAP_CREATE, &attr, sizeof(attr));
 syscall(__NR_bpf, cmd, attr, size);
 ```
-
-
-
-
 
 
 
@@ -116,7 +114,9 @@ syscall(__NR_bpf, cmd, attr, size);
 
     
 
-map遍历
+## map遍历
+
+**模板**
 
 ```c
 int result;
@@ -158,7 +158,7 @@ while (1)//或者遍历多个map
 }
 ```
 
-
+**举例**
 
 ```c
 int result;
@@ -206,180 +206,272 @@ while (1)
 
 ------
 
-## map定义
+## map-api in kernel
 
-```c
-// 定义HASH_MAP，使用 BCC 宏定义，key 为 u64 类型，value 为 struct val_t 结构；
-BPF_HASH(infotmp, u64, struct val_t);
-```
+从用户态到内核态的系统调用
 
-![](sock_example_bcc版本实现.jpg)
-
-typora-notes/bpf_read/BCC/bcc-宏.md
-
-### BPF_HASH
-
-```c
-// 定义HASH_MAP，使用 BCC 宏定义，就是map，key 为 u64 类型，value 为 struct val_t 结构；
-BPF_HASH(infotmp, u64, struct val_t);
-
-infotmp.update(&id, &val);  // 保存中间结果至 hash_map 中,以 id 为 key，将 val 对象结果保存至 infotmp 中；
-
-// 用于读取在map中保存的信息，如果未查询到则直接返回，
-// 需要注意的是 lookup 函数的入参和出参都是指针类型，使用前需要判断；
-valp = infotmp.lookup(&id); // infotmp[id]， 从 hash_map 中获取到  sys_open 函数保存的中间数据
-if (valp == 0) {//没有找到
-    // missed entry
-    return 0;
-}
-
-infotmp.delete(&id);  // 删除这个k-v pair
-```
-
-
-
-c代码对应的定义方式
-
-k含义
-
-v含义
-
-
-
-
-
-### BPF_ARRAY
-
-```c
-// 定义ARRAY_MAP，使用 BCC 宏定义，不能用map观点，就是个数组，每个元素是u64类型，数组大小256
-BPF_ARRAY(count_map, u64, 256);
-
-int count_packets(struct __sk_buff *skb)
+  ```c
+//linux-5.14.14/tools/lib/bpf/bpf.h
+//linux-5.14.14/tools/lib/bpf/bpf.c
+int bpf_map_lookup_elem(int fd, const void *key, void *value)
 {
-    int index = load_byte(skb, ETH_HLEN + offsetof(struct iphdr, protocol));
+	union bpf_attr attr;
+	int ret;
+
+	memset(&attr, 0, sizeof(attr));
+	attr.map_fd = fd;
+	attr.key = ptr_to_u64(key);
+	attr.value = ptr_to_u64(value);
+
+	ret = sys_bpf(BPF_MAP_LOOKUP_ELEM, &attr, sizeof(attr));
+	return libbpf_err_errno(ret);
+}
+
+//linux-5.14.14/tools/lib/bpf/bpf.c
+static inline int sys_bpf(enum bpf_cmd cmd, union bpf_attr *attr,
+			  unsigned int size)
+{
+	return syscall(__NR_bpf, cmd, attr, size);
+}
+
+//------------------------------ K ------------------------------
+//linux-5.14.14/kernel/bpf/syscall.c
+SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
+{
+	return __sys_bpf(cmd, USER_BPFPTR(uattr), size);
+}
+
+//linux-5.14.14/kernel/bpf/syscall.c
+static int __sys_bpf(int cmd, bpfptr_t uattr, unsigned int size)
+{
+	union bpf_attr attr;
+	int err;
+
+	if (copy_from_bpfptr(&attr, uattr, size) != 0)
+		return -EFAULT;
+
+	switch (cmd) {
+
+	case BPF_MAP_LOOKUP_ELEM:
+		err = map_lookup_elem(&attr);
+		break;
+
+}
+
+//linux-5.14.14/kernel/bpf/syscall.c
+static int map_lookup_elem(union bpf_attr *attr)
+{
+
+	int ufd = attr->map_fd;
+
+	f = fdget(ufd);
+	map = __bpf_map_get(f);
+
+	value_size = bpf_map_value_size(map);
+
+	err = -ENOMEM;
+	value = kmalloc(value_size, GFP_USER | __GFP_NOWARN);
+	if (!value)
+		goto free_key;
+
+	err = bpf_map_copy_value(map, key, value, attr->flags);
+
+	err = -EFAULT;
+	if (copy_to_user(uvalue, value, value_size) != 0)
+		goto free_value;
+
+}
+
+static int bpf_map_copy_value(struct bpf_map *map, void *key, void *value,
+			      __u64 flags)
+{
+	void *ptr;
+	int err;
+
+		if (map->ops->map_lookup_elem_sys_only)
+			ptr = map->ops->map_lookup_elem_sys_only(map, key);
+		else
+			ptr = map->ops->map_lookup_elem(map, key);
+
+	return err;
+}
+
+//map->ops->map_lookup_elem(map, key);	各种 bpf_map_ops都会实现map_lookup_elem，当前map类型决定使用哪种实现
     
-    //这个是类似于arr[index]，但是返回的不是对应的数据，而是&arr[index]
-    u64 *val = count_map.lookup(&index);
-    if(val)//如果index超出数组大小，那么返回空指针
-        count_map.increment(index);
-    return 0;
+// linux-5.14.14/kernel/bpf/arraymap.c
+const struct bpf_map_ops array_map_ops = {
+
+	.map_lookup_elem = array_map_lookup_elem,// @@@
+
+	.map_btf_name = "bpf_array",
+	.map_btf_id = &array_map_btf_id,
+	.iter_seq_info = &iter_seq_info,
+};
+
+static void *array_map_lookup_elem(struct bpf_map *map, void *key)
+{
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	u32 index = *(u32 *)key;
+
+	if (unlikely(index >= array->map.max_entries))
+		return NULL;
+
+	return array->value + array->elem_size * (index & array->index_mask);
 }
-```
-
-U中使用：
-
-```python
-# bpf["count_map"]获取到这个array
-# bpf["count_map"][socket.IPPROTO_TCP]类似于arr[index]，U空间不再是&arr[index]，而是真正这个元素的值
-# .value表示ctypes.c_ulong 类型转化为int
-TCP_cnt = bpf["count_map"][socket.IPPROTO_TCP].value
-```
+  ```
 
 
-
-如果是array类型的映射，那么可以使用==__sync_fetch_and_add==对数组的元素值进行原子计算
 
 ```c
-//samples/bpf/sockex1_kern.c
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__type(key, u32);
-	__type(value, long);
-	__uint(max_entries, 256);
-} my_map SEC(".maps");
+// 用户态，返回值0表示查找成功
+int bpf_map_lookup_elem(map_fd, &k, &v)
 
-value = bpf_map_lookup_elem(&my_map, &index);
-	if (value)
-		__sync_fetch_and_add(value, skb->len);//对应的数组元素值增加skb->len
-```
-
-
-
-c代码对应的定义方式
-
-k含义
-
-v含义
-
-------
-
-### BPF_MAP_TYPE_PERF_EVENT_ARRAY
-
-k含义：u32，可以为cpu个数
-
-v含义：u32，作为perf event buffer从内核往用户空间传递数据时，是 SYS_PERF_EVENT_OPEN系统调用的返回值，表示一个fd。
-
-​             参见bpf_read/PerfBuffer_RingBuffer.md
-
-```go
-func CreatePerfMap(mapPath string, maxEntries uint32) (int, error) {
-	var key, val uint32
-	cfg := MapConfig{
-		MapType:    BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-		KeySize:    unsafe.Sizeof(key),
-		ValSize:    unsafe.Sizeof(val),
-		MaxEntries: maxEntries,
-	}
-
-	fd, err := CreatePinnedMapFd(&cfg, mapPath)
-	if err != nil {
-		return -1, err
-	}
-	return fd, nil
+BPF_CALL_2(bpf_map_lookup_elem, struct bpf_map *, map, void *, key)
+{
+	WARN_ON_ONCE(!rcu_read_lock_held());
+	return (unsigned long) map->ops->map_lookup_elem(map, key);// 很明显，又是想模仿c++多态，各种map自己去实现lookup的过程
 }
 
-rf.perfFd, err = unix.PerfEventOpen(&attr, -1, rf.cpuIdx, -1, unix.PERF_FLAG_FD_CLOEXEC)
-
-MapUpdate(p.BpfMapFd, unsafe.Pointer(&cpuIdx), unsafe.Pointer(&rf.perfFd), 0)
+// 内核态，kernel/bpf/helpers.c，返回查找结果的指针，为空表示不存在
+void *bpf_map_lookup_elem(struct bpf_map *map, void *key)
 ```
 
-------
+所以要看各种map自己的实现，比如 `kernel/bpf/`路径下的各种map
 
-### BPF_MAP_TYPE_PERCPU_ARRAY
-
-samples/bpf/xdp1_kern.c
-
-samples/bpf/xdp1_user.c
-
-typora-notes/bpf_read/samples/xdp1.md
+array map
 
 ```c
-struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__type(key, u32);
-	__type(value, long);//根据key搜索到的是一个数组，大小是cpu个数，数组的每个元素，就是value
-	__uint(max_entries, 256);// key：0～255，总共256个
-} rxcnt SEC(".maps");
+// linux-5.14.14/kernel/bpf/arraymap.c
+const struct bpf_map_ops array_map_ops = {
+	.map_meta_equal = array_map_meta_equal,
+	.map_alloc_check = array_map_alloc_check,
+	.map_alloc = array_map_alloc,
+	.map_free = array_map_free,
+	.map_get_next_key = array_map_get_next_key,
+	.map_lookup_elem = array_map_lookup_elem,// @@@
+	.map_update_elem = array_map_update_elem,
+	.map_delete_elem = array_map_delete_elem,
+	.map_gen_lookup = array_map_gen_lookup,
+	.map_direct_value_addr = array_map_direct_value_addr,
+	.map_direct_value_meta = array_map_direct_value_meta,
+	.map_mmap = array_map_mmap,
+	.map_seq_show_elem = array_map_seq_show_elem,
+	.map_check_btf = array_map_check_btf,
+	.map_lookup_batch = generic_map_lookup_batch,
+	.map_update_batch = generic_map_update_batch,
+	.map_set_for_each_callback_args = map_set_for_each_callback_args,
+	.map_for_each_callback = bpf_for_each_array_elem,
+	.map_btf_name = "bpf_array",
+	.map_btf_id = &array_map_btf_id,
+	.iter_seq_info = &iter_seq_info,
+};
 
-unsigned int nr_cpus = bpf_num_possible_cpus();
-__u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
-while (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
-    __u32 key = UINT32_MAX;
-    __u64 sum = 0;
+static void *array_map_lookup_elem(struct bpf_map *map, void *key)
+{
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	u32 index = *(u32 *)key;
 
-    assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
-    for (i = 0; i < nr_cpus; i++)
-        sum += values[i];
-    if (sum > prev[key])
-        printf("proto %u: %10llu pkt/s\n",
-               key, (sum - prev[key]) / interval);
-    prev[key] = sum;//每种协议的丢包总数
+	if (unlikely(index >= array->map.max_entries))
+		return NULL;
+
+	return array->value + array->elem_size * (index & array->index_mask);
 }
 ```
 
-使用 bpf_map_lookup_elem(map_fd, &key, values) 获取的 values 是个数组，大小就是运行环境的cpu个数，数组的元素类型就是map定义时的value
+```c
+// linux-5.14.14/kernel/bpf/arraymap.c
+const struct bpf_map_ops percpu_array_map_ops = {
+	.map_meta_equal = bpf_map_meta_equal,
+	.map_alloc_check = array_map_alloc_check,
+	.map_alloc = array_map_alloc,
+	.map_free = array_map_free,
+	.map_get_next_key = array_map_get_next_key,
+	.map_lookup_elem = percpu_array_map_lookup_elem,// @@@
+	.map_update_elem = array_map_update_elem,
+	.map_delete_elem = array_map_delete_elem,
+	.map_seq_show_elem = percpu_array_map_seq_show_elem,
+	.map_check_btf = array_map_check_btf,
+	.map_lookup_batch = generic_map_lookup_batch,
+	.map_update_batch = generic_map_update_batch,
+	.map_set_for_each_callback_args = map_set_for_each_callback_args,
+	.map_for_each_callback = bpf_for_each_array_elem,
+	.map_btf_name = "bpf_array",
+	.map_btf_id = &percpu_array_map_btf_id,
+	.iter_seq_info = &iter_seq_info,
+};
 
-例子中，key是==协议类型==，values是个数组，每个元素是各个cpu的丢包数，也就是value。
+/* Called from eBPF program */
+static void *percpu_array_map_lookup_elem(struct bpf_map *map, void *key)
+{
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	u32 index = *(u32 *)key;
 
-所以协议对应的values中每个元素的和，就是这种协议类型在所有cpu上的丢包总和。
+	if (unlikely(index >= array->map.max_entries))
+		return NULL;
 
-------
+	return this_cpu_ptr(array->pptrs[index & array->index_mask]);
+}
 
-### cpumap
+```
 
-`XDP_REDIRECT` 与 `XDP_TX` 类似，但是通过另一个网卡将包发出去。另外， `XDP_REDIRECT` 还可以将包重定向到一个 BPF cpumap，即，当前执行 XDP 程序的 CPU 可以将这个包交给某个远端 CPU，由后者将这个包送到更上层的内核栈，当前 CPU 则继续在这个网卡执行接收和处理包的任务。这**和 `XDP_PASS` 类似，但当前 CPU 不用去做将包送到内核协议栈的准备工作（分配 `skb`，初始化等等），这部分开销还是很大的**。
+hash map
 
-`XDP_REDIRECT` 返回码还可以和 BPF cpumap 一起使用，对那些目标是本机协议栈、 将由 non-XDP 的远端（remote）CPU 处理的包进行负载均衡。
+```c
+// linux-5.14.14/kernel/bpf/hashtab.c
+const struct bpf_map_ops htab_map_ops = {
+	.map_meta_equal = bpf_map_meta_equal,
+	.map_alloc_check = htab_map_alloc_check,
+	.map_alloc = htab_map_alloc,
+	.map_free = htab_map_free,
+	.map_get_next_key = htab_map_get_next_key,
+	.map_lookup_elem = htab_map_lookup_elem, // @@@
+	.map_lookup_and_delete_elem = htab_map_lookup_and_delete_elem,
+	.map_update_elem = htab_map_update_elem,
+	.map_delete_elem = htab_map_delete_elem,
+	.map_gen_lookup = htab_map_gen_lookup,
+	.map_seq_show_elem = htab_map_seq_show_elem,
+	.map_set_for_each_callback_args = map_set_for_each_callback_args,
+	.map_for_each_callback = bpf_for_each_hash_elem,
+	BATCH_OPS(htab),
+	.map_btf_name = "bpf_htab",
+	.map_btf_id = &htab_map_btf_id,
+	.iter_seq_info = &iter_seq_info,
+};
 
-------
+static void *htab_map_lookup_elem(struct bpf_map *map, void *key)
+{
+	struct htab_elem *l = __htab_map_lookup_elem(map, key);
+
+	if (l)
+		return l->key + round_up(map->key_size, 8);
+
+	return NULL;
+}
+
+/* Called from syscall or from eBPF program directly, so
+ * arguments have to match bpf_map_lookup_elem() exactly.
+ * The return value is adjusted by BPF instructions
+ * in htab_map_gen_lookup().
+ */
+static void *__htab_map_lookup_elem(struct bpf_map *map, void *key)
+{
+	struct bpf_htab *htab = container_of(map, struct bpf_htab, map);
+	struct hlist_nulls_head *head;
+	struct htab_elem *l;
+	u32 hash, key_size;
+
+	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_trace_held() &&
+		     !rcu_read_lock_bh_held());
+
+	key_size = map->key_size;
+
+	hash = htab_map_hash(key, key_size, htab->hashrnd);
+
+	head = select_bucket(htab, hash);
+
+	l = lookup_nulls_elem_raw(head, hash, key, key_size, htab->n_buckets);
+
+	return l;
+}
+```
 

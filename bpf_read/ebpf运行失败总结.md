@@ -125,3 +125,168 @@ I suspect clang compiles out the assignments for `data` and `data_end` if you do
 
 
 
+------
+
+## 读取未初始化的变量或者结构体
+
+### 1.初始化结构体部分字段
+
+https://stackoverflow.com/questions/62441361/bpf-how-to-inspect-syscall-arguments
+
+```c
+// linux-5.14.14\samples\bpf\trace_output_kern.c
+SEC("kprobe/" SYSCALL(sys_write))
+int bpf_prog1(struct pt_regs *ctx)
+{
+	struct S {
+		u64 pid;
+		u64 cookie;
+	} data;
+
+	data.pid = bpf_get_current_pid_tgid();// 这两行初始化data的字段，缺一不可
+	data.cookie = 0x12345678;
+
+	bpf_perf_event_output(ctx, &my_map, 0, &data, sizeof(data));// 不进行上面对data的初始化，这里会报错
+
+	return 0;
+}
+```
+
+假如：
+
+```c
+    struct S {
+            u64 pid;
+            u64 cookie;
+            char bleh[128]; //<-- added this 
+    } data;
+
+	data.pid = bpf_get_current_pid_tgid();// 并没有具体初始化 bleh
+	data.cookie = 0x12345678;
+
+	bpf_perf_event_output(ctx, &my_map, 0, &data, sizeof(data));// 所以会报错
+
+
+/usr/src/linux-5.4/samples/bpf# ./trace_output
+bpf_load_program() err=13
+0: (bf) r6 = r1
+1: (85) call bpf_get_current_pid_tgid#14
+2: (b7) r1 = 305419896
+3: (7b) *(u64 *)(r10 -136) = r1
+4: (7b) *(u64 *)(r10 -144) = r0
+5: (bf) r4 = r10
+6: (07) r4 += -144
+7: (bf) r1 = r6
+8: (18) r2 = 0xffff8975bd44aa00
+10: (b7) r3 = 0
+11: (b7) r5 = 144
+12: (85) call bpf_perf_event_output#25
+invalid indirect read from stack off -144+16 size 144
+processed 12 insns (limit 1000000) max_states_per_insn 0 total_states 0 peak_states 0 mark_read 0
+0: (bf) r6 = r1
+1: (85) call bpf_get_current_pid_tgid#14
+2: (b7) r1 = 305419896
+3: (7b) *(u64 *)(r10 -136) = r1
+4: (7b) *(u64 *)(r10 -144) = r0
+5: (bf) r4 = r10
+6: (07) r4 += -144
+7: (bf) r1 = r6
+8: (18) r2 = 0xffff8975bd44aa00
+10: (b7) r3 = 0
+11: (b7) r5 = 144
+12: (85) call bpf_perf_event_output#25       // 这里
+invalid indirect read from stack off -144+16 size 144
+processed 12 insns (limit 1000000) max_states_per_insn 0 total_states 0 peak_states 0 mark_read 0
+
+ // 修改
+    struct S {
+        u64 pid;
+        u64 cookie;
+        char bleh[128];
+    } data = {0}; // 修改，初始化
+```
+
+
+
+
+
+------
+
+## libbpf代码中混用bcc方式
+
+### 1. 模仿bcc，将跟踪函数的入参，写入ebpf prog的上下文
+
+https://stackoverflow.com/questions/62441361/bpf-how-to-inspect-syscall-arguments
+
+```c
+//试图跟踪exec，获取其入参filename的值
+
+/* Signature of sys_execve: 
+asmlinkage long sys_execve(const char __user *filename,
+                			const char __user *const __user *argv,
+                			const char __user *const __user *envp);
+*/
+
+SEC("kprobe/__x64_sys_execve")
+int bpf_prog1(struct pt_regs *ctx, const char *filename)
+{
+        struct S {
+                u64 pid;
+                u64 cookie;
+                char bleh[128];
+        } data;
+
+        data.pid = bpf_get_current_pid_tgid();
+        data.cookie = 0x12345678;
+        //bpf_get_current_comm(&data.bleh, 128);
+        bpf_probe_read(&data.bleh, 128, (void *)filename);
+
+        bpf_perf_event_output(ctx, &my_map, 0, &data, sizeof(data));
+
+        return 0;
+}
+
+
+/usr/src/linux-5.4/samples/bpf# ./borky
+bpf_load_program() err=13
+0: (bf) r6 = r2
+R2 !read_ok
+processed 1 insns (limit 1000000) max_states_per_insn 0 total_states 0 peak_states 0 mark_read 0
+0: (bf) r6 = r2
+R2 !read_ok
+processed 1 insns (limit 1000000) max_states_per_insn 0 total_states 0 peak_states 0 mark_read 0
+```
+
+You cannot pass the syscall arguments to your function `bpf_prog1()` as you do, it only takes the `struct pt_regs *ctx`. 
+
+You likely saw this syntax in bcc, but [bcc rewrites it under the hood](https://github.com/iovisor/bcc/blob/v0.14.0/src/cc/frontends/clang/b_frontend_action.cc#L692). Prefer the `PT_REGS_PARM*(ctx)` macros to access them ([tracex1_kern.c](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/samples/bpf/tracex1_kern.c?h=v5.7#n33), [definition](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/tools/lib/bpf/bpf_tracing.h?h=v5.7#n50)).
+
+```c
+//试图跟踪exec，获取其入参filename的值
+
+/* Signature of sys_execve: 
+asmlinkage long sys_execve(const char __user *filename,
+                			const char __user *const __user *argv,
+                			const char __user *const __user *envp);
+*/
+
+SEC("kprobe/__x64_sys_execve")
+int bpf_prog1(struct pt_regs *ctx)
+{
+        struct S {
+                u64 pid;
+                u64 cookie;
+                char bleh[128];
+        } data;
+
+        data.pid = bpf_get_current_pid_tgid();
+        data.cookie = 0x12345678;
+        //bpf_get_current_comm(&data.bleh, 128);
+        bpf_probe_read(&data.bleh, 128, (void *)PT_REGS_PARM1(ctx));// 使用这个宏，去获取第一个参数
+
+        bpf_perf_event_output(ctx, &my_map, 0, &data, sizeof(data));
+
+        return 0;
+}
+```
+

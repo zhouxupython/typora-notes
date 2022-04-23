@@ -5,7 +5,7 @@
 | [bpf-helpers(7) - Linux manual page (man7.org)](https://man7.org/linux/man-pages/man7/bpf-helpers.7.html) | helper函数API官方 |
 | ------------------------------------------------------------ | ----------------- |
 | [绿色记忆:eBPF学习笔记 (gmem.cc)](https://blog.gmem.cc/ebpf) | helper函数API中文 |
-|                                                              |                   |
+| https://blogs.oracle.com/linux/post/bpf-in-depth-bpf-helper-functions |                   |
 |                                                              |                   |
 
 bpf_skb_store_bytes
@@ -14,7 +14,11 @@ bpf_skb_store_bytes
     return bpf_redirect(p_conn->ifindex, 0);
 
 ---------------------------------------------------------------------------
-## bpf_skb_store_bytes
+## socket-related program functions
+
+有一个综合例子：https://blogs.oracle.com/linux/post/bpf-using-bpf-to-do-packet-transformation & litiezi1978/bpf-mapper-agent/
+
+### bpf_skb_store_bytes
 
 802.3 ETH2帧格式
 
@@ -98,7 +102,7 @@ bpf_skb_store_bytes(skb, ICMP_TYPE_OFF, &new_type, sizeof(new_type), 0);
 
 ------
 
-## bpf_skb_load_bytes
+### bpf_skb_load_bytes
 
 签名： 		int bpf_skb_load_bytes(const struct sk_buff *skb, u32 offset, void *to, u32 len)
 
@@ -190,6 +194,39 @@ static __always_inline __u32 tcp_load(struct __ctx_buf *ctx,  __u64 offset, ipv4
     return BPFM_OK;
 ```
 
+------
+
+### bpf_setsockopt
+
+签名： 		int bpf_setsockopt(struct bpf_sock_ops *bpf_socket, int level, int optname, char *optval, int optlen)
+
+针对bpf_socket关联的套接字发起一个setsockopt()操作，此套接字必须是full socket。optname为选项名，optval/optlen指定了选项值，level指定了选项的位置。
+
+该函数实际上实现了setsockopt()的子集，支持以下level：
+
+1. SOL_SOCKET，支持选项SO_RCVBUF, SO_SNDBUF, SO_MAX_PACING_RATE, SO_PRIORITY, SO_RCVLOWAT, SO_MARK
+2. IPPROTO_TCP，支持选项TCP_CONGESTION, TCP_BPF_IW, TCP_BPF_SNDCWND_CLAMP
+3. IPPROTO_IP，支持选项IP_TOS
+4. IPPROTO_IPV6，支持选项IPV6_TCLASS
+
+------
+
+### bpf_skb_change_proto
+
+签名： 		int bpf_skb_change_proto(struct sk_buff *skb, __be16 proto, u64 flags)
+
+将skb的协议改为proto。目前仅仅支持将IPv4改为IPv6。助手函数会做好底层工作，例如修改套接字缓冲的大小。
+
+eBPF程序需要调用 skb_store_bytes 填充必要的新的报文头字段，并调用 bpf_l3_csum_replace、bpf_l4_csum_replace 重新计算Checksum。
+
+该助手函数的主要意义是执行一个NAT64操作。
+
+在内部实现上，封包的GSO（generic segmentation offload）类型标记为dodgy，因而报文头被检查，TCP分段被GSO/GRO引擎重新分段。
+
+flags必须清零，这个参数暂时没有使用。
+
+调用此助手函数会导致封包缓冲区改变，因此在加载期间校验器对指针的校验将失效，必须重新校验。
+
 
 
 ------
@@ -199,6 +236,8 @@ static __always_inline __u32 tcp_load(struct __ctx_buf *ctx,  __u64 offset, ipv4
 bpf_csum_diff
 bpf_l3_csum_replace
 bpf_l4_csum_replace
+
+有一个综合例子：https://blogs.oracle.com/linux/post/bpf-using-bpf-to-do-packet-transformation & litiezi1978/bpf-mapper-agent/
 
 ![](checksum.png)
 
@@ -248,7 +287,7 @@ static inline void set_ip_tos(struct __sk_buff *skb, __u8 new_tos)
 ```
 
 
-#### bpf_csum_diff
+### bpf_csum_diff
 
 签名： s64 bpf_csum_diff(__be32 *from, u32 from_size, __be32 ***to**, u32 to_size, __wsum seed)
 
@@ -284,7 +323,7 @@ static inline void set_ip_tos(struct __sk_buff *skb, __u8 new_tos)
 ​              Return The checksum result, or a negative error code in
 ​                     case of failure.
 
-#### bpf_l3_csum_replace
+### bpf_l3_csum_replace
 
 签名： **int** bpf_l3_csum_replace(**struct** sk_buff *skb, u32 offset, u64 from, u64 **to**, u64 size)
 
@@ -321,7 +360,7 @@ static inline void set_ip_tos(struct __sk_buff *skb, __u8 new_tos)
 ​              Return 0 on success, or a negative error in case of
 ​                     failure.
 
-#### bpf_l4_csum_replace
+### bpf_l4_csum_replace
 
 签名： **int** bpf_l4_csum_replace(**struct** sk_buff *skb, u32 offset, u64 from, u64 **to**, u64 flags)
 

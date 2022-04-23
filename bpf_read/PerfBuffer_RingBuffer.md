@@ -1,16 +1,33 @@
 [Trace](https://blog.csdn.net/pwl999/category_7733476.html)
 
+bpf call
+
+perf event array 专用
+
+- `bpf_perf_event_{read, read_value}()`
+- `bpf_perf_event_output()`
+
+ring buffer 专用
+
+- `bpf_ringbuf_output()`
+- `bpf_ringbuf_reserve()`
+- `bpf_ringbuf_submit()`
+- `bpf_ringbuf_discard()`
+- `bpf_ringbuf_query()`
 
 
-**cilium/ebpf**
 
-## perf buffer
+
+
+## cilium/ebpf中的实现
+
+### perf buffer
 
 1   写的时候是在ebpf prog程序中
 
 ```c
 struct map events __section("maps") = {
-    .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,          PerfEventArray
+    .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,          // ebpf.PerfEventArray
 };
 
 __section("xdp") 
@@ -79,12 +96,7 @@ events表示PerfEventArray类型的map，BPF_F_CURRENT_CPU表示当前cpu的编�
 
 
 
-
-------------------------------------------------------
-------------------------------------------------------
-------------------------------------------------------
-
-## ringbuf
+### ringbuf
 
 1   写的时候是在ebpf prog程序中
 

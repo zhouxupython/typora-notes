@@ -1,5 +1,7 @@
 # cubectl
 
+------
+
 ## cube
 
 **cube**		Cube Common Subcommands
@@ -28,6 +30,19 @@
 ​                             --max-rule-num uint32        firewall max rule num  (range: 64~16000) (default 4196)
 ​                             --statistic-enable           statistic enable if set this flag
 ​                             -w, --workmode string            work mode type < ==normal== | whitelist | blacklist > (default "normal")
+
+
+
+​                        **slimfirewall**               Create a slimfirewall cube
+
+​                                    *CUBE_NAME*
+
+​                             -c, --conntrack string           conntrack mode < disable | ==auto== > (default "auto")
+​                         	--log-level string           trace log level < debug | info | warning | error | none >  (default "error")
+​                        	 --max-conntrack-num uint32   slimfirewall max conntrack num (limit: 655360) (default 65536)
+​                         	--max-rule-num uint32        slimfirewall max rule num (limit: 20648) (default 8192)
+​                         	--statistic-enable           statistic enable if set this flag
+​                         	-w, --workmode string            work mode type < ==whitelist== | blacklist > (default "whitelist")
 
 
 
@@ -66,9 +81,9 @@
 
 ​									*CUBE_NAME*
 
-  							--log-level string   trace log level < debug | info | warning | ==error== | none >  (default "error")
+​						      --log-level string   trace log level < debug | info | warning | ==error== | none >  (default "error")
 
-  							-t, --type string        hook type <==xdp-in== | tc-in | tc-out | tc-both> (default "xdp-in")
+​						      -t, --type string        hook type <==xdp-in== | tc-in | tc-out | tc-both> (default "xdp-in")
 
 
 
@@ -197,6 +212,8 @@
 ​										$ cubectl cube show list firewall
 
 ​										$ cubectl cube show info fw0
+
+------
 
 ## ddos-mitigator
 
@@ -353,7 +370,7 @@ Flags:
 
 ```
 
-
+------
 
 ## firewall
 
@@ -526,6 +543,8 @@ conntrack enable		cubectl cube create
 config rules					cubectl firewall rule append/insert
 default action				cubectl firewall set action
 
+------
+
 ## slimfirewall
 
 ​    **slimfirewall**   SlimFirewall Cube Subcommands
@@ -559,7 +578,7 @@ default action				cubectl firewall set action
 
 ​            **set**         SlimFirewall Cube Set Subcommands
 ​                    **action**      Set slimfirewall global action
-​                            -a, --action string      global action < accept-all | deny-all | normal >
+​                            -a, --action string      global action < accept-all | deny-all | ==normal== >
 ​                            -c, --cube string        cube name
 ​                                 --direction string   rule direction < ingress | egress >
 
@@ -637,6 +656,8 @@ hook <egress  > :
 
 
 
+------
+
 ## forwarder
 
 **forwarder**  	Forwarder Cube Subcommands
@@ -690,6 +711,8 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 
 
 
+------
+
 ## nat
 
 **nat**     Nat Cube Subcommands
@@ -735,6 +758,8 @@ cubectl forwarder rule append -c fwd1 -i port4 -o port3
 ​						**rule**        Display all rules of a nat cube
 ​									-c, --cube string   cube name
 ​									-t, --type string   rule type < snat | dnat >
+
+------
 
 ## loadbalancer
 

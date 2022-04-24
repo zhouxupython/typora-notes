@@ -1,19 +1,138 @@
+# netlink
+
+## 资料
+
+[linux的netlink接口详解(上)](https://blog.csdn.net/banruoju/article/details/69387232)
+
+[linux的netlink接口详解（中）](https://blog.csdn.net/banruoju/article/details/73635994)
+
+[linux的netlink接口详解（下）](https://blog.csdn.net/banruoju/article/details/77833538)
+
+[Netlink 内核实现分析 1](https://www.cnblogs.com/codestack/p/10849427.html)
+
+[Netlink 内核实现分析 2](https://www.cnblogs.com/codestack/p/10849706.html)
+
+[Netlink 内核实现分析 3](https://www.cnblogs.com/codestack/p/10850184.html)
+
+[Netlink 内核实现分析 4](https://www.cnblogs.com/codestack/p/10850608.html)
+
+
+
+## NETLINK_ROUTE回调函数的初始化
+
 [Netlink实现Linux内核与用户空间通信](http://www.cpplive.com/html/1362.html)
 
+[Linux-内核通信之netlink机制-详解](https://blog.csdn.net/sty23122555/article/details/51581979)
 
+```c
+netlink_kernel_create(struct net *net, int unit, struct netlink_kernel_cfg *cfg)		// include/linux/netlink.h
+    __netlink_kernel_create			net/netlink/af_netlink.c
+    
+    
+/* optional Netlink kernel configuration parameters */
+struct netlink_kernel_cfg {
+	unsigned int	groups;
+	unsigned int	flags;
+	void		(*input)(struct sk_buff *skb);
+	struct mutex	*cb_mutex;
+	int		(*bind)(struct net *net, int group);
+	void		(*unbind)(struct net *net, int group);
+	bool		(*compare)(struct net *net, struct sock *sk);
+};
+
+//net/core/rtnetlink.c
+static int __net_init rtnetlink_net_init(struct net *net)
+{
+	struct sock *sk;
+	struct netlink_kernel_cfg cfg = {
+		.groups		= RTNLGRP_MAX,
+		.input		= rtnetlink_rcv,// 收到用户态NETLINK_ROUTE协议的数据后，触发这个	// step-5
+		.cb_mutex	= &rtnl_mutex,
+		.flags		= NL_CFG_F_NONROOT_RECV,
+		.bind		= rtnetlink_bind,
+	};
+
+	sk = netlink_kernel_create(net, NETLINK_ROUTE, &cfg);
+	if (!sk)
+		return -ENOMEM;
+	net->rtnl = sk;
+	return 0;
+}
+
+static void __net_exit rtnetlink_net_exit(struct net *net)
+{
+	netlink_kernel_release(net->rtnl);
+	net->rtnl = NULL;
+}
+
+static struct pernet_operations rtnetlink_net_ops = {// rtnetlink_init中注册  @@@-2
+	.init = rtnetlink_net_init,			// step-4
+	.exit = rtnetlink_net_exit,
+};
+
+// netlink_proto_init中调用
+void __init rtnetlink_init(void)//@@@-1
+{
+    register_pernet_subsys(&rtnetlink_net_ops);//@@@-2		// step-3
+	register_netdevice_notifier(&rtnetlink_dev_notifier);
+
+	rtnl_register(PF_UNSPEC, RTM_GETLINK, rtnl_getlink, rtnl_dump_ifinfo, 0);
+	rtnl_register(PF_UNSPEC, RTM_SETLINK, rtnl_setlink, NULL, 0);
+	rtnl_register(PF_UNSPEC, RTM_NEWLINK, rtnl_newlink, NULL, 0);//
+	rtnl_register(PF_UNSPEC, RTM_DELLINK, rtnl_dellink, NULL, 0);
+
+
+static int __init netlink_proto_init(void)//net/netlink/af_netlink.c
+{
+    
+    sock_register(&netlink_family_ops);
+	register_pernet_subsys(&netlink_net_ops);//@@@-3
+	register_pernet_subsys(&netlink_tap_net_ops);
+	/* The netlink device handler may be needed early. */
+	rtnetlink_init();//@@@-1	// step-2
+}
+core_initcall(netlink_proto_init);// step-1
+    
+//------------
+static struct pernet_operations __net_initdata netlink_net_ops = {//@@@-3
+	.init = netlink_net_init,
+	.exit = netlink_net_exit,
+};
+
+static int __net_init netlink_net_init(struct net *net)
+{
+#ifdef CONFIG_PROC_FS
+	if (!proc_create_net("netlink", 0, net->proc_net, &netlink_seq_ops,
+			sizeof(struct nl_seq_iter)))
+		return -ENOMEM;
+#endif
+	return 0;
+}
+    
+static void __net_exit netlink_net_exit(struct net *net)
+{
+#ifdef CONFIG_PROC_FS
+	remove_proc_entry("netlink", net->proc_net);
+#endif
+}
+```
+
+
+
+## 用户态socket
 
 ```c
 socket(AF_NETLINK, SOCK_RAW|SOCK_CLOEXEC, NETLINK_ROUTE)
 ```
 
-第一个参数必须是 AF_NETLINK 或 PF_NETLINK，在 Linux 中，它们俩实际为一个东西，它表示要使用netlink，
+第一个参数必须是 `AF_NETLINK`或 `PF_NETLINK`，在 Linux 中，它们俩实际为一个东西，它表示要使用**netlink**，
 
-第二个参数必须是SOCK_RAW或SOCK_DGRAM，
+第二个参数必须是`SOCK_RAW`或`SOCK_DGRAM`，
 
 第三个参数指定netlink协议类型：
 
 ```c
-#define NETLINK_ROUTE 0 //路由守护进程  
+#define NETLINK_ROUTE 0 //路由守护进程  @@@
 #define NETLINK_W1 1 //1-wire 子系统  
 #define NETLINK_USERSOCK 2 //用户态套结字协议  
 #define NETLINK_FIREWALL 3 //防火墙  
@@ -34,7 +153,7 @@ socket(AF_NETLINK, SOCK_RAW|SOCK_CLOEXEC, NETLINK_ROUTE)
 
 
 
-==NETLINK_ROUTE==
+### NETLINK_ROUTE
 
 ==流量过滤==：RTM_NEWTFILTER, RTM_DELTFILTER, RTM_GETTFILTER
 
@@ -54,7 +173,7 @@ Traffic Classes used with Queues: RTM_NEWTCLASS, RTM_DELTCLASS, RTM_GETTCLASS
 
 
 
-举例：
+### 举例
 
 ```c
 #include <stdio.h>  
@@ -141,37 +260,13 @@ int main(void)
 
 
 
+### iproute2的使用
 
-
-
-
-
-
-[linux的netlink接口详解(上)](https://blog.csdn.net/banruoju/article/details/69387232)
-
-[linux的netlink接口详解（中）](https://blog.csdn.net/banruoju/article/details/73635994)
-
-[linux的netlink接口详解（下）](https://blog.csdn.net/banruoju/article/details/77833538)
-
-[Netlink 内核实现分析 1](https://www.cnblogs.com/codestack/p/10849427.html)
-
-[Netlink 内核实现分析 2](https://www.cnblogs.com/codestack/p/10849706.html)
-
-[Netlink 内核实现分析 3](https://www.cnblogs.com/codestack/p/10850184.html)
-
-[Netlink 内核实现分析 4](https://www.cnblogs.com/codestack/p/10850608.html)
-
-
-
-
-
-
-
-
+socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, protocol);
 
 ```c
 // iproute2
-// tc filter add dev fwbr0tofwns1 ingress bpf da obj cls_test.o sec classifier/hello
+// 实现命令  tc filter add dev fwbr0tofwns1 ingress bpf da obj cls_test.o sec classifier/hello
 // tc/tc.c
 int main(int argc, char **argv)
 	do_cmd

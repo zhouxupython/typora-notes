@@ -34,6 +34,8 @@
 
 
 
+------
+
 ## 创建map
 
 ### bpf(BPF_MAP_CREATE
@@ -113,6 +115,8 @@ syscall(__NR_bpf, cmd, attr, size);
 - `map_fd`也是一个数组，在运行上文提到的[`load_maps()`](https://elixir.bootlin.com/linux/v4.15/source/samples/bpf/bpf_load.c#L212)函数时，一旦完成创建BPF Map系统调用生成fd后，同样会[添加到这个数组中](https://elixir.bootlin.com/linux/v4.15/source/samples/bpf/bpf_load.c#L242)去。 
 
     
+
+------
 
 ## map遍历
 
@@ -208,7 +212,7 @@ while (1)
 
 ## map-api in kernel
 
-从用户态到内核态的系统调用
+### 从用户态到内核态的系统调用
 
   ```c
 //linux-5.14.14/tools/lib/bpf/bpf.h
@@ -236,6 +240,7 @@ static inline int sys_bpf(enum bpf_cmd cmd, union bpf_attr *attr,
 
 //------------------------------ K ------------------------------
 //linux-5.14.14/kernel/bpf/syscall.c
+//@@@@@@@@@@@@@
 SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
 {
 	return __sys_bpf(cmd, USER_BPFPTR(uattr), size);
@@ -244,7 +249,7 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 //linux-5.14.14/kernel/bpf/syscall.c
 static int __sys_bpf(int cmd, bpfptr_t uattr, unsigned int size)
 {
-	union bpf_attr attr;
+	union bpf_attr attr;// 用户空间传来的uattr，映射到内核空间的attr
 	int err;
 
 	if (copy_from_bpfptr(&attr, uattr, size) != 0)
@@ -274,10 +279,10 @@ static int map_lookup_elem(union bpf_attr *attr)
 	if (!value)
 		goto free_key;
 
-	err = bpf_map_copy_value(map, key, value, attr->flags);
+	err = bpf_map_copy_value(map, key, value, attr->flags);// 查找到的结果会拷贝给value
 
 	err = -EFAULT;
-	if (copy_to_user(uvalue, value, value_size) != 0)
+	if (copy_to_user(uvalue, value, value_size) != 0)// 再将结果返回给用户空间，完成整个系统调用
 		goto free_value;
 
 }
@@ -288,55 +293,36 @@ static int bpf_map_copy_value(struct bpf_map *map, void *key, void *value,
 	void *ptr;
 	int err;
 
-		if (map->ops->map_lookup_elem_sys_only)
-			ptr = map->ops->map_lookup_elem_sys_only(map, key);
-		else
-			ptr = map->ops->map_lookup_elem(map, key);
+    if (map->ops->map_lookup_elem_sys_only)
+        ptr = map->ops->map_lookup_elem_sys_only(map, key);
+    else
+        ptr = map->ops->map_lookup_elem(map, key);
+	
+    copy_map_value(map, value, ptr);// 查找到的结果会拷贝给value
 
 	return err;
 }
 
-//map->ops->map_lookup_elem(map, key);	各种 bpf_map_ops都会实现map_lookup_elem，当前map类型决定使用哪种实现
-    
-// linux-5.14.14/kernel/bpf/arraymap.c
-const struct bpf_map_ops array_map_ops = {
-
-	.map_lookup_elem = array_map_lookup_elem,// @@@
-
-	.map_btf_name = "bpf_array",
-	.map_btf_id = &array_map_btf_id,
-	.iter_seq_info = &iter_seq_info,
-};
-
-static void *array_map_lookup_elem(struct bpf_map *map, void *key)
+// include/linux/bpf.h
+/* copy everything but bpf_spin_lock */
+static inline void copy_map_value(struct bpf_map *map, void *dst, void *src)
 {
-	struct bpf_array *array = container_of(map, struct bpf_array, map);
-	u32 index = *(u32 *)key;
+	if (unlikely(map_value_has_spin_lock(map))) {
+		u32 off = map->spin_lock_off;
 
-	if (unlikely(index >= array->map.max_entries))
-		return NULL;
-
-	return array->value + array->elem_size * (index & array->index_mask);
+		memcpy(dst, src, off);
+		memcpy(dst + off + sizeof(struct bpf_spin_lock),
+		       src + off + sizeof(struct bpf_spin_lock),
+		       map->value_size - off - sizeof(struct bpf_spin_lock));
+	} else {
+		memcpy(dst, src, map->value_size);
+	}
 }
   ```
 
+`map->ops->map_lookup_elem(map, key);`
 
-
-```c
-// 用户态，返回值0表示查找成功
-int bpf_map_lookup_elem(map_fd, &k, &v)
-
-BPF_CALL_2(bpf_map_lookup_elem, struct bpf_map *, map, void *, key)
-{
-	WARN_ON_ONCE(!rcu_read_lock_held());
-	return (unsigned long) map->ops->map_lookup_elem(map, key);// 很明显，又是想模仿c++多态，各种map自己去实现lookup的过程
-}
-
-// 内核态，kernel/bpf/helpers.c，返回查找结果的指针，为空表示不存在
-void *bpf_map_lookup_elem(struct bpf_map *map, void *key)
-```
-
-所以要看各种map自己的实现，比如 `kernel/bpf/`路径下的各种map
+各种 bpf_map_ops都会实现map_lookup_elem，当前map类型决定使用哪种实现所以要看各种map自己的实现，比如 `kernel/bpf/`路径下的各种map
 
 array map
 
@@ -377,6 +363,8 @@ static void *array_map_lookup_elem(struct bpf_map *map, void *key)
 	return array->value + array->elem_size * (index & array->index_mask);
 }
 ```
+
+percpu_array
 
 ```c
 // linux-5.14.14/kernel/bpf/arraymap.c
@@ -473,5 +461,79 @@ static void *__htab_map_lookup_elem(struct bpf_map *map, void *key)
 
 	return l;
 }
+```
+
+等等
+
+------
+
+### 内核态内部使用的helper函数
+
+```c
+// kernel/bpf/helpers.c
+// 内核态，返回查找结果的指针，为空表示不存在
+void *bpf_map_lookup_elem(struct bpf_map *map, void *key)
+    
+// 用户态，bpf_map_lookup_elem(map_fd, &k, &v);  返回值0表示查找成功
+
+/* If kernel subsystem is allowing eBPF programs to call this function,
+ * inside its own verifier_ops->get_func_proto() callback it should return
+ * bpf_map_lookup_elem_proto, so that verifier can properly check the arguments
+ *
+ * Different map implementations will rely on rcu in map methods
+ * lookup/update/delete, therefore eBPF programs must run under rcu lock
+ * if program is allowed to access maps, so check rcu_read_lock_held in
+ * all three functions.
+ */
+BPF_CALL_2(bpf_map_lookup_elem, struct bpf_map *, map, void *, key)
+{
+	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
+	return (unsigned long) map->ops->map_lookup_elem(map, key);
+}
+
+const struct bpf_func_proto bpf_map_lookup_elem_proto = {
+	.func		= bpf_map_lookup_elem,
+	.gpl_only	= false,
+	.pkt_access	= true,
+	.ret_type	= RET_PTR_TO_MAP_VALUE_OR_NULL,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+	.arg2_type	= ARG_PTR_TO_MAP_KEY,
+};
+
+const struct bpf_func_proto *
+bpf_base_func_proto(enum bpf_func_id func_id)
+{
+	switch (func_id) {
+	case BPF_FUNC_map_lookup_elem:
+		return &bpf_map_lookup_elem_proto;// @@@
+	case BPF_FUNC_map_update_elem:
+		return &bpf_map_update_elem_proto;
+
+//bpf_map_update_elem
+BPF_CALL_4(bpf_map_update_elem, struct bpf_map *, map, void *, key,
+	   void *, value, u64, flags)
+{
+	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
+	return map->ops->map_update_elem(map, key, value, flags);
+}
+
+const struct bpf_func_proto bpf_map_update_elem_proto = {
+	.func		= bpf_map_update_elem,
+	.gpl_only	= false,
+	.pkt_access	= true,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+	.arg2_type	= ARG_PTR_TO_MAP_KEY,
+	.arg3_type	= ARG_PTR_TO_MAP_VALUE,
+	.arg4_type	= ARG_ANYTHING,
+};
+            
+// kernel/bpf/syscall.c
+const struct bpf_func_proto * __weak
+tracing_prog_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
+{
+	return bpf_base_func_proto(func_id);
+}
+
 ```
 

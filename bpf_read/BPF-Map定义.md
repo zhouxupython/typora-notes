@@ -139,7 +139,7 @@ rf.perfFd, err = unix.PerfEventOpen(&attr, -1, rf.cpuIdx, -1, unix.PERF_FLAG_FD_
 MapUpdate(p.BpfMapFd, unsafe.Pointer(&cpuIdx), unsafe.Pointer(&rf.perfFd), 0)
 ```
 
-举例：
+举例1：
 
 ```c
 struct msg {
@@ -208,13 +208,15 @@ linux-5.14.14/samples/bpf/trace_output_kern.c
 
 
 
-
+举例2：typora-notes/bpf_read/PerfBuffer_RingBuffer.md
 
 ------
 
 ### BPF_MAP_TYPE_RINGBUF
 
 https://github.com/torvalds/linux/blob/v5.10/Documentation/bpf/ringbuf.rst
+
+举例1：typora-notes/bpf_read/PerfBuffer_RingBuffer.md
 
 ------
 

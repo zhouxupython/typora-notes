@@ -304,6 +304,10 @@ Similar to ARRAY_OF_MAPS for for hash. See https://www.mail-archive.com/netdev@v
 
 defined in kernel/bpf/stackmap.c. Kernel programs can store stacks via  the bpf_get_stackid() helper. The idea is we store stacks based on an  identifier which appears to correspond to a 32-bit hash of the  instruction pointer addresses that comprise the stack for the current  context. The common use case is to get stack id in kernel, and use it as key to update another map. So for example we could profile specific  stack traces by counting their occurence, or associate a specific stack  trace with the current pid as key. See samples/bpf/offwaketime_kern.c  for an example of the latter. In user-space we can look up the symbols  associated with the stackmap to unwind the stack (see  samples/bpf/offwaketime_user.c).
 
+
+
+samples/bpf/trace_event_kern.c
+
 ------
 
 ### BPF_MAP_TYPE_LPM_TRIE

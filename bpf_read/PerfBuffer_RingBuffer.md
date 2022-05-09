@@ -132,5 +132,13 @@ unix.EpollWait(p.epollFd, events, -1)
 
 kernel/bpf/ringbuf.c
 
+github:bpf-ringbuf-examples
+tools/lib/bpf/ringbuf.c
 tools/testing/selftests/bpf/progs/test_ringbuf.c
 
+
+
+https://fntlnz.wtf/post/bpf-ring-buffer-usage/
+https://arthurchiao.art/blog/bpf-ringbuf-zh/
+https://juejin.cn/post/6956031662916534279
+https://www.kernel.org/doc/html/latest/bpf/ringbuf.html

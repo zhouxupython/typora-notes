@@ -290,3 +290,11 @@ int bpf_prog1(struct pt_regs *ctx)
 }
 ```
 
+------
+
+## 指针与变量的运算
+
+### 1.编译器优化导致校验器无法获知变量取值范围
+
+参考 `d-cube/ebpf/falied/1_math_between_pkt_pointer_and_register_with_unbounded_min_value_is_not_allowed`
+

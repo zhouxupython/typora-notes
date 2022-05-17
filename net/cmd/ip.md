@@ -75,12 +75,44 @@ test1 (id: 1)
 
 ## addr
 
+2、为网络接口分配IPv4地址
+asn@dell60:~$ sudo ip addr add 192.168.15.60/24 dev enp65s0f1
+asn@dell60:~$ sudo ip addr add 192.168.16.60/24 dev enp65s0f0
 
+
+sudo ip addr del 192.168.15.60/24 dev enp65s0f1
+ip link set enp0s3 down/up
+
+asn@dell61:~$ sudo ip addr add 192.168.15.61/24 dev enp65s0f1
+asn@dell61:~$ sudo ip addr add 192.168.16.61/24 dev enp65s0f0
 
 
 
 ## link
 
+
+
+
+
+查看全部网卡
+
+目录 /sys/class/net/
+
+    [root@localhost ~]# ls /sys/class/net/
+    br-df65b94a220f  docker0  enp0s31f6  lo  veth1706661  veth2566f96  veth7c083c7  vethd4a4beb  vethfa8ecf9  vethfd44a20  wlp1s0
+
+查看虚拟网卡
+
+目录 /sys/devices/virtual/net/
+
+    [root@localhost ~]# ls /sys/devices/virtual/net/
+    br-df65b94a220f  docker0  lo  veth1706661  veth2566f96  veth7c083c7  vethd4a4beb  vethfa8ecf9  vethfd44a20
+
+查看物理网卡
+
+    [root@localhost ~]# ls /sys/class/net/ | grep -v "`ls /sys/devices/virtual/net/`"
+    enp0s31f6
+    wlp1s0
 
 
 

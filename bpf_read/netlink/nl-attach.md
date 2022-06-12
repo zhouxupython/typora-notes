@@ -9,6 +9,10 @@ https://blog.csdn.net/already_skb/article/details/123074373     xdp 程序如何
 https://blog.csdn.net/already_skb/article/details/123091334     Generic XDP Hook
 https://blog.csdn.net/already_skb/article/details/123073814     Native xdp hook 点
 
+[重看ebpf -代码载入执行点-hook](https://www.cnblogs.com/codestack/p/14733074.html)
+
+https://switch-router.gitee.io/blog/bpf-3/
+
 一般由`bpf_set_link_xdp_fd`发起
 
 ```c

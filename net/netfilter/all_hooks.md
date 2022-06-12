@@ -472,7 +472,7 @@ nf_hook_entry_hookfn(const struct nf_hook_entry *entry, struct sk_buff *skb,
 
 
 
-![hooks2](hooks2-16474222999214.png)
+<img src="hooks2-16474222999214.png" alt="hooks2" style="zoom:150%;" />
 
 ![](hooks3-16474222999213.png)
 

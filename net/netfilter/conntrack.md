@@ -11,7 +11,7 @@
 | [(五)洞悉linux下的Netfilter&iptables：如何理解连接跟踪机制？【上】](https://www.cnblogs.com/masterpanda/p/5700498.html)<br/>[(六)洞悉linux下的Netfilter&iptables：如何理解连接跟踪机制？【中】](https://www.cnblogs.com/masterpanda/p/5700497.html)<br/>[(七)洞悉linux下的Netfilter&iptables：如何理解连接跟踪机制？【下】](https://www.cnblogs.com/masterpanda/p/5700496.html) | 图片缺失，未看                                               |
 | [iptables连接跟踪ip_conntrack](https://blog.51cto.com/wushank/1264758) | ==NEW & ESTABLISHED & RELATED==<br/>tcp、udp、icmp通信时conntrack的状态变化 |
 |                                                              |                                                              |
-|                                                              |                                                              |
+| [Linux netfilter 学习笔记 之十二 ip层netfilter的NAT模块代码分析](https://blog.csdn.net/lickylin/article/details/36740207) |                                                              |
 |                                                              |                                                              |
 
 

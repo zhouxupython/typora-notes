@@ -10,3 +10,9 @@
 
 [5]Linux协议栈--Netfilter源码分析: http://cxd2014.github.io/2017/08/23/netfilter/
 
+
+
+
+
+[Linux netfilter 学习笔记 之十二 ip层netfilter的NAT模块代码分析](https://blog.csdn.net/lickylin/article/details/36740207)
+

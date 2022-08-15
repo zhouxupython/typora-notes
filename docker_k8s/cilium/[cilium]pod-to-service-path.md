@@ -1,6 +1,6 @@
 [Life of a Packet in Cilium：实地探索 Pod-to-Service 转发路径及 BPF 处理逻辑](http://arthurchiao.art/blog/cilium-life-of-a-packet-pod-to-service-zh/)
 
-![cilium-pod-to-service-path](./cilium-pod-to-service-path.png)
+<img src="./cilium-pod-to-service-path.png" alt="cilium-pod-to-service-path" style="zoom:150%;" />
 
 ## Step 1: POD1 eth0 发送
 
@@ -26,7 +26,7 @@ Address               HWtype  HWaddress           Flags Mask            Iface
 # cilium_host的ip是10.1.1.1，但是mac却不是3e:74:f2:60:ab:9b，Cilium改动了arp表  @@@@@@@@@@@@@
 (NODE1) $ ifconfig cilium_host
 cilium_host: flags=4291<UP,BROADCAST,RUNNING,NOARP,MULTICAST>  mtu 1500
-        inet 10.1.1.1  netmask 255.255.255.255  broadcast 0.0.0.0
+        inet 10.1.1.1  netmask 255.255.255.255  broadcast 0.0.0.0               ### here, ip is .1, but mac is not ...:9b
         ether 3e:7d:6b:32:44:8e  txqueuelen 1000  (Ethernet)
         ...
 
@@ -40,7 +40,7 @@ cilium_host: flags=4291<UP,BROADCAST,RUNNING,NOARP,MULTICAST>  mtu 1500
     link/ether 5e:d9:e5:0d:a1:ed brd ff:ff:ff:ff:ff:ff link-netnsid 0
 
 # 容器的 eth0 index 就是 698，对端是 699
-# Cilium 通过 hardcode ARP 表，强制将 Pod 流量的下一跳劫持到 veth pair 的主机端。这里不过多讨论设计，只说一点：这并不是 Cilium 独有的设计，其他 方案也有这么做的。
+# Cilium 通过 hardcode ARP 表(修改的是Pod的ARP表)，强制将 Pod 流量的下一跳劫持到 veth pair 的主机端。这里不过多讨论设计，只说一点：这并不是 Cilium 独有的设计，其他 方案也有这么做的。
 ```
 
 ## Step 2: POD1 eth0 对端设备（lxcxx）BPF 处理
@@ -50,9 +50,9 @@ cilium_host: flags=4291<UP,BROADCAST,RUNNING,NOARP,MULTICAST>  mtu 1500
 (NODE1) $ tc filter show dev lxc00aa ingress
 filter protocol all pref 1 bpf
 filter protocol all pref 1 bpf handle 0x1 bpf_lxc.o:[from-container] direct-action not_in_hw tag 3855f578c6616972
+```
 
 代码是：
-```
 
 ```c
 // bpf\bpf_lxc.c
@@ -71,7 +71,7 @@ int cil_from_container(struct __ctx_buff *ctx)
                 |    lb4_local()
                 |      |-ct_create4
                 |      |-lb4_lookup_backend
-                |      |-lb4_xlate
+                |      |-lb4_xlate                                // @@@ 包的 `dst_ip` 已经是真实 Pod IP（`POD4_IP`）了
                 |
                 |-policy_can_egress4()
                 |
@@ -107,7 +107,11 @@ Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
 
 因此包接下来会到达 `bond0` 设备。
 
-> 本文的 node 都是两个物理网卡做了 bond，如果没有 bond，例如只有一个 eth0 物理网卡，宿主机 IP 配置在 eth0，那接下来包到达的就是 eth0 物理网卡。这种主机上配置 了 IP 地址的设备（这里是指**bond**吧？？？），在 Cilium 里叫 ==native device==。文档或代码中经常会看到。
+> 本文的 node 都是两个物理网卡做了 bond，如果没有 bond，例如只有一个 eth0 物理网卡，宿主机 IP 配置在 eth0，那接下来包到达的就是 eth0 物理网卡。这种主机上配置 了 IP 地址的设备（这里是指**bond**吧？？？或者这里也包括eth0？），在 Cilium 里叫 ==native device==。文档或代码中经常会看到。
+
+==bond是什么？==
+
+
 
 ## Step 4: NODE1 bond/物理网卡：egress BPF 处理
 
@@ -164,7 +168,7 @@ Address                  HWtype  HWaddress           Flags Mask            Iface
 
 命中宿主机默认路由，因此会
 
-- **将 `bond0` 的 MAC 作为 `src_mac`**：MAC 地址只在二层网络内有效，宿主机和 Pod 属于不同二层网络（Cilium 自己管理了一个 CIDR），宿主机做转发时会将 `src_mac` 换成自己的 MAC。
+- **将 `bond0` 的 MAC 作为 `src_mac`**：MAC 地址只在二层网络内有效，==宿主机和 Pod 属于不同二层网络==（Cilium 自己管理了一个 CIDR），宿主机做转发时会将 `src_mac` 换成自己的 MAC。
 - **将宿主机网关对应的 MAC 作为 `dst_mac`**：下一跳是宿主机网关。
 
 然后包就经过 bond0 和物理网卡发送到数据中心网络了。
@@ -193,7 +197,7 @@ Address                  HWtype  HWaddress           Flags Mask            Iface
 >
 > 排障时的一个区别：
 >
-> 1. 在二层/大二层网络中，对于同一个包，**发送方和接收方看到的 src_mac 是一样的**，因为二层转发只修改 dst_mac，不会修改 src_mac。
+> 1. 在二层/大二层网络中，对于同一个包，**发送方和接收方看到的 src_mac 是一样的**，因为二层转发==只修改 dst_mac，不会修改 src_mac==。
 > 2. 三层组网中，src_mac 和 dst_mac 都会变。
 >
 > 抓包时要理解这一点。
@@ -230,7 +234,7 @@ __section_tail(CILIUM_MAP_CALLS, CILIUM_CALL_IPV4_FROM_NETDEV)
 tail_handle_ipv4_from_netdev
   |-tail_handle_ipv4
       |-handle_ipv4
-          |-ep = lookup_ip4_endpoint()                        // 此时ep就是 POD4
+          |-ep = lookup_ip4_endpoint()                        // 此时ep就是 POD4，根据数据包的dip进行查找
           |-ipv4_local_delivery(ctx, ep)
     		  |-ipv4_l3(ctx, l3_off, (__u8 *) &router_mac, (__u8 *) &lxc_mac, ip4);   // bond0将数据包src、dst mac进行调整
               |-tail_call_dynamic(ctx, &POLICY_CALL_MAP, ep->lxc_id);
@@ -272,7 +276,7 @@ static __always_inline int ipv4_local_delivery(struct __ctx_buff *ctx, int l3_of
 	mac_t router_mac = ep->node_mac;   // 此时ep就是 POD4
 	mac_t lxc_mac = ep->mac;
 
-	// bond0将数据包src mac调整为bond0 mac； dst mac调整为POD4 mac（还是POD4 veth pair对端lxc00dd 的 mac ？？？ ）
+	// Node2上的bond0将数据包src mac调整为bond0 mac； dst mac调整为POD4 mac（还是POD4 veth pair对端lxc00dd 的 mac ？？？ ）
 	ret = ipv4_l3(ctx, l3_off, (__u8 *) &router_mac, (__u8 *) &lxc_mac, ip4);
     
     tail_call_dynamic(ctx, &POLICY_CALL_MAP, ep->lxc_id);// lxc_id 是POD4 veth pair对端lxc00dd 的 egress ebpf prog ID

@@ -2,6 +2,28 @@
 
 <img src="./cilium-pod-to-service-path.png" alt="cilium-pod-to-service-path" style="zoom:150%;" />
 
+
+
+## step0: wrapper around nsenter to nsenter-ctn
+
+```bash
+# nsenter-ctn is a a wrapper around nsenter, which executes commands in the specified container's namespace</code>:
+
+# Example: nsenter-ctn <ctn-id> -n ip addr show eth0
+# add into ~/.bashrc
+function nsenter-ctn () {
+    CTN=$1 # Container ID or name
+    PID=$(sudo docker inspect --format "{{.State.Pid}}" $CTN)
+    shift 1 # Remove the first arguement, shift remaining ones to the left
+    sudo nsenter -t $PID $@
+}
+
+#Put it into your ~/.bashrc then
+(node) $ source ~/.bashrc
+```
+
+
+
 ## Step 1: POD1 eth0 发送
 
 本来查到的dst_mac是cilium_host的mac地址，但是Cilium 通过 ==hardcode ARP 表==，将dst_mac分配给`lxc00aa`，从而强制将 Pod 流量的下一跳劫持到 veth pair 的主机端`lxc00aa`。

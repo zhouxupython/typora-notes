@@ -322,6 +322,50 @@ Map supporting efficient longest-prefix matching. Useful for storage/retrieval o
 
 sockmaps are used primarily for socket redirection, where sockets added to a socket map and referenced by a key which dictates redirection when bpf_sockmap_redirect() is called.
 
+http://arthurchiao.art/blog/socket-acceleration-with-ebpf-zh/
+
+```c
+// linux-5.14.14\include\uapi\linux\bpf.h
+
+ *
+ * long bpf_sock_hash_update(struct bpf_sock_ops *skops, struct bpf_map *map, void *key, u64 flags)
+ *	Description
+ *		Add an entry to, or update a sockhash *map* referencing sockets.
+ *		The *skops* is used as a new value for the entry associated to
+ *		*key*. *flags* is one of:
+ *
+ *		**BPF_NOEXIST**
+ *			The entry for *key* must not exist in the map.
+ *		**BPF_EXIST**
+ *			The entry for *key* must already exist in the map.
+ *		**BPF_ANY**
+ *			No condition on the existence of the entry for *key*.
+ *
+ *		If the *map* has eBPF programs (parser and verdict), those will
+ *		be inherited by the socket being added. If the socket is
+ *		already attached to eBPF programs, this results in an error.
+ *	Return
+ *		0 on success, or a negative error in case of failure.
+ *
+ * long bpf_msg_redirect_hash(struct sk_msg_buff *msg, struct bpf_map *map, void *key, u64 flags)
+ *	Description
+ *		This helper is used in programs implementing policies at the
+ *		socket level. If the message *msg* is allowed to pass (i.e. if
+ *		the verdict eBPF program returns **SK_PASS**), redirect it to
+ *		the socket referenced by *map* (of type
+ *		**BPF_MAP_TYPE_SOCKHASH**) using hash *key*. Both ingress and
+ *		egress interfaces can be used for redirection. The
+ *		**BPF_F_INGRESS** value in *flags* is used to make the
+ *		distinction (ingress path is selected if the flag is present,
+ *		egress path otherwise). This is the only flag supported for now.
+ *	Return
+ *		**SK_PASS** on success, or **SK_DROP** on error.
+ 
+ 
+```
+
+
+
 ------
 
 ### BPF_MAP_TYPE_DEVMAP
